@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/careerup/api-gateway/internal/client"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
 )

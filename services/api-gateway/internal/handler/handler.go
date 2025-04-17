@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/careerup/api-gateway/internal/client"
-	v1 "github.com/careerup/proto/v1"
+	v1 "github.com/careerup-Inc/careerup-monorepo/proto/v1"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )

@@ -4,9 +4,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/careerup/api-gateway/internal/client"
-	"github.com/careerup/api-gateway/internal/handler"
-	"github.com/careerup/api-gateway/internal/middleware"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	v1 "github.com/careerup/proto/v1"
+	v1 "github.com/careerup-Inc/careerup-monorepo/proto/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

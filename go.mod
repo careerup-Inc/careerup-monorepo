@@ -1,3 +1,5 @@
-module github.com/YOUR-USER-OR-ORG-NAME/YOUR-REPO-NAME
+module github.com/careerup-Inc/careerup-monorepo
 
-go 1.19
+go 1.21
+
+toolchain go1.24.2
