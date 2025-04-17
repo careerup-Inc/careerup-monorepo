@@ -61,8 +61,7 @@ services:
     ports:
       - "8090:8090"
     environment:
-      - READY_PLAYER_ME_API_KEY=${READY_PLAYER_ME_API_KEY}
-      - DID_API_KEY=${DID_API_KEY}
+      - VROID_HUB_API_KEY=${VROID_HUB_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
 
   # Recommendation Service

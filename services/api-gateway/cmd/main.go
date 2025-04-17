@@ -59,6 +59,7 @@ func main() {
 	// Public routes
 	r.POST("/register", h.Register)
 	r.POST("/login", h.Login)
+	r.POST("/auth/validate", h.ValidateToken)
 
 	// Protected routes
 	auth := r.Group("/")

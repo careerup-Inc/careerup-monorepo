@@ -9,10 +9,17 @@ import (
 )
 
 type AvatarService struct {
-	vroidClient *client.VRoidClient
+	vroidClient client.VRoidClientInterface
 }
 
-func NewAvatarService(vroidClient *client.VRoidClient) *AvatarService {
+func NewAvatarService(apiKey string) *AvatarService {
+	var vroidClient client.VRoidClientInterface
+	if apiKey == "" {
+		vroidClient = client.NewMockVRoidClient()
+	} else {
+		vroidClient = client.NewVRoidClient(apiKey)
+	}
+
 	return &AvatarService{
 		vroidClient: vroidClient,
 	}

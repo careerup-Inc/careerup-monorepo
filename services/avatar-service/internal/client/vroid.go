@@ -15,6 +15,13 @@ const (
 	vroidAPIBaseURL = "https://hub.vroid.com/api/v1"
 )
 
+type VRoidClientInterface interface {
+	GenerateAvatar(ctx context.Context, req *model.AvatarGenerationRequest) (*model.Avatar, error)
+	GetAvatar(ctx context.Context, id string) (*model.Avatar, error)
+	UpdateAvatar(ctx context.Context, id string, req *model.AvatarUpdateRequest) (*model.Avatar, error)
+	DeleteAvatar(ctx context.Context, id string) error
+}
+
 type VRoidClient struct {
 	apiKey     string
 	httpClient *http.Client

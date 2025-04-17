@@ -65,6 +65,10 @@ type UpdateUserRequest struct {
 	Interests []string `json:"interests" example:"['AI', 'Machine Learning']"`
 }
 
+type ValidateTokenRequest struct {
+	Token string `json:"token" binding:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+}
+
 // @Summary Register a new user
 // @Description Register a new user with email and password
 // @Tags auth
@@ -232,4 +236,30 @@ func (h *Handler) WebSocket(c *gin.Context) {
 			}
 		}
 	}
+}
+
+// @Summary Validate token
+// @Description Validates an authentication token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body ValidateTokenRequest true "Token to validate"
+// @Success 200 {object} v1.User
+// @Failure 400 {object} gin.H
+// @Failure 401 {object} gin.H
+// @Router /auth/validate [post]
+func (h *Handler) ValidateToken(c *gin.Context) {
+	var req ValidateTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := h.authClient.ValidateToken(c.Request.Context(), req.Token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
 }
