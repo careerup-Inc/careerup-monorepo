@@ -22,3 +22,44 @@ vendor/
 
 .env
 
+# Java specific
+*.class
+*.jar
+*.war
+*.ear
+*.log
+*.log.*
+*.iml
+*.ipr
+*.iws
+.idea/
+.gradle/
+build/
+out/
+target/
+bin/
+
+# Spring Boot specific
+application-*.properties
+!application.properties
+!application.yml
+spring-boot-devtools.properties
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Gradle
+.gradle/
+gradle/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+!gradlew
+!gradlew.bat

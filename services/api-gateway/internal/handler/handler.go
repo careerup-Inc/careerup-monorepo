@@ -26,6 +26,10 @@ import (
 // @BasePath /
 // @schemes http
 
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -75,20 +79,20 @@ type ValidateTokenRequest struct {
 // @Accept json
 // @Produce json
 // @Param request body RegisterRequest true "Register Request"
-// @Success 201 {object} v1.User
-// @Failure 400 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 201 {object} User
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 // @Router /register [post]
 func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	user, err := h.authClient.Register(c.Request.Context(), req.Email, req.Password, req.FirstName, req.LastName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register user"})
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to register user"})
 		return
 	}
 
@@ -101,20 +105,20 @@ func (h *Handler) Register(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body LoginRequest true "Login Request"
-// @Success 200 {object} v1.LoginResponse
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
+// @Success 200 {object} LoginResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
 // @Router /login [post]
 func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	resp, err := h.authClient.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid credentials"})
 		return
 	}
 
@@ -126,20 +130,20 @@ func (h *Handler) Login(c *gin.Context) {
 // @Tags user
 // @Produce json
 // @Security ApiKeyAuth
-// @Success 200 {object} v1.User
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 {object} User
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 // @Router /me [get]
 func (h *Handler) GetCurrentUser(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "user not authenticated"})
 		return
 	}
 
 	user, err := h.authClient.GetCurrentUser(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get user"})
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to get user"})
 		return
 	}
 
@@ -153,21 +157,21 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 // @Produce json
 // @Security ApiKeyAuth
 // @Param request body UpdateUserRequest true "Update Request"
-// @Success 200 {object} v1.User
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Success 200 {object} User
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 // @Router /me [put]
 func (h *Handler) UpdateUser(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "user not authenticated"})
 		return
 	}
 
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -180,7 +184,7 @@ func (h *Handler) UpdateUser(c *gin.Context) {
 
 	user, err := h.authClient.UpdateUser(c.Request.Context(), userID, updateReq)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to update user"})
 		return
 	}
 
@@ -192,20 +196,20 @@ func (h *Handler) UpdateUser(c *gin.Context) {
 // @Tags chat
 // @Security ApiKeyAuth
 // @Success 101 {string} string "Switching Protocols"
-// @Failure 401 {object} gin.H
-// @Failure 500 {object} gin.H
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
 // @Router /ws [get]
 func (h *Handler) WebSocket(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "user not authenticated"})
 		return
 	}
 
 	// Upgrade HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to upgrade connection"})
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to upgrade connection"})
 		return
 	}
 	defer conn.Close()
@@ -213,7 +217,7 @@ func (h *Handler) WebSocket(c *gin.Context) {
 	// Create gRPC stream
 	stream, err := h.chatClient.Stream(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create chat stream"})
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to create chat stream"})
 		return
 	}
 
@@ -239,25 +243,25 @@ func (h *Handler) WebSocket(c *gin.Context) {
 }
 
 // @Summary Validate token
-// @Description Validates an authentication token
+// @Description Validate an authentication token
 // @Tags auth
 // @Accept json
 // @Produce json
 // @Param request body ValidateTokenRequest true "Token to validate"
-// @Success 200 {object} v1.User
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
+// @Success 200 {object} User
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
 // @Router /auth/validate [post]
 func (h *Handler) ValidateToken(c *gin.Context) {
 	var req ValidateTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	user, err := h.authClient.ValidateToken(c.Request.Context(), req.Token)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid token"})
 		return
 	}
 

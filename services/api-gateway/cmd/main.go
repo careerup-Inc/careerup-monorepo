@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	_ "github.com/careerup-Inc/careerup-monorepo/services/api-gateway/docs"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/middleware"
@@ -54,7 +55,10 @@ func main() {
 	r.Use(middleware.Auth(authClient))
 
 	// Swagger documentation
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
+		ginSwagger.URL("http://localhost:8080/swagger/doc.json"),
+		ginSwagger.DefaultModelsExpandDepth(-1),
+	))
 
 	// Public routes
 	r.POST("/register", h.Register)

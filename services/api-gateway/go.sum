@@ -12,8 +12,8 @@ github.com/bytedance/sonic v1.5.0/go.mod h1:ED5hyg4y6t3/9Ku1R6dU/4KyJ48DZ4jPhfY1
 github.com/bytedance/sonic v1.10.0-rc/go.mod h1:ElCzW+ufi8qKqNW0FY314xriJhyJhuoJ3gFZdAHF7NM=
 github.com/bytedance/sonic v1.11.2 h1:ywfwo0a/3j9HR8wsYGWsIWl2mvRsI950HyoxiBERw5A=
 github.com/bytedance/sonic v1.11.2/go.mod h1:iZcSUejdk5aukTND/Eu/ivjQuEL0Cu9/rf50Hi0u/g4=
-github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250417133439-fcd328f2e86e h1:l6AgJOlw0wMb4OcqOMvO4KbvvxgabgrN+FTNXe9UuXE=
-github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250417133439-fcd328f2e86e/go.mod h1:+zf/ICwHueyweoq02VcGAUbJigTgFB/PfLrJeH+79y8=
+github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250417143350-19557d345346 h1:rmuQf28rwkqdz/I5+xHIZC8xFJ/8KcDZyHRO+arE/pw=
+github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250417143350-19557d345346/go.mod h1:+zf/ICwHueyweoq02VcGAUbJigTgFB/PfLrJeH+79y8=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/chenzhuoyu/base64x v0.0.0-20211019084208-fb5309c8db06/go.mod h1:DH46F32mSOjUmXrMHnKwZdA8wcEefY7UVqBKYGjpdQY=
