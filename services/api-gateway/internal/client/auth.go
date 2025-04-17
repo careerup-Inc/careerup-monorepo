@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	v1 "github.com/careerup-Inc/careerup-monorepo/proto/v1"
+	v1 "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -30,7 +30,7 @@ func (c *AuthClient) Close() error {
 	return c.conn.Close()
 }
 
-func (c *AuthClient) Register(ctx context.Context, email, password, firstName, lastName string) (*v1.User, error) {
+func (c *AuthClient) Register(ctx context.Context, email, password, firstName, lastName string) (*v1.RegisterResponse, error) {
 	resp, err := c.client.Register(ctx, &v1.RegisterRequest{
 		Email:     email,
 		Password:  password,
@@ -56,7 +56,7 @@ func (c *AuthClient) Login(ctx context.Context, email, password string) (*v1.Log
 	return resp, nil
 }
 
-func (c *AuthClient) GetCurrentUser(ctx context.Context, userID string) (*v1.User, error) {
+func (c *AuthClient) GetCurrentUser(ctx context.Context, userID string) (*v1.GetCurrentUserResponse, error) {
 	resp, err := c.client.GetCurrentUser(ctx, &v1.GetCurrentUserRequest{})
 	if err != nil {
 		log.Printf("Failed to get current user: %v", err)
@@ -65,7 +65,7 @@ func (c *AuthClient) GetCurrentUser(ctx context.Context, userID string) (*v1.Use
 	return resp, nil
 }
 
-func (c *AuthClient) UpdateUser(ctx context.Context, userID string, req *v1.UpdateUserRequest) (*v1.User, error) {
+func (c *AuthClient) UpdateUser(ctx context.Context, userID string, req *v1.UpdateUserRequest) (*v1.UpdateUserResponse, error) {
 	resp, err := c.client.UpdateUser(ctx, req)
 	if err != nil {
 		log.Printf("Failed to update user: %v", err)

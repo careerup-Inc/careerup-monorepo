@@ -4,6 +4,7 @@
 
 # Generate protobuf code
 proto:
+	rm -rf proto/gen proto/*.pb.go proto/*_grpc.pb.go
 	cd proto && buf generate
 
 # Build all services
@@ -32,7 +33,7 @@ clean:
 			rm -rf $$service/bin; \
 		fi \
 	done
-	rm -rf proto/gen
+	rm -rf proto/gen proto/*.pb.go proto/*_grpc.pb.go
 
 # Run all services locally
 run:

@@ -8,7 +8,25 @@ import (
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/middleware"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
+
+// @title CareerUP API
+// @version 1.0
+// @description This is the CareerUP API server.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8080
+// @BasePath /
+// @schemes http
 
 func main() {
 	// Initialize clients
@@ -34,6 +52,9 @@ func main() {
 	r.Use(middleware.CORS())
 	r.Use(middleware.RateLimit())
 	r.Use(middleware.Auth(authClient))
+
+	// Swagger documentation
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Public routes
 	r.POST("/register", h.Register)
