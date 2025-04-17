@@ -11,7 +11,7 @@ The system consists of the following services:
 - **rec-service** (Java/Quarkus): Recommendation & similarity ML
 - **chat-gateway** (Go/Fiber): Multiplex client WebSockets → LLM
 - **llm-gateway** (Go/LangChainGo): Prompt-orchestration, RAG, OpenAI calls
-- **avatar-service** (Go): Ready Player Me & D-ID orchestration, TTS
+- **avatar-service** (Go): VRoid Studio model management & D-ID orchestration, TTS
 - **notification** (Go/Fiber): Push alerts via Redis streams
 
 ## Development Setup
@@ -26,29 +26,33 @@ The system consists of the following services:
 
 ### Getting Started
 
-1. Install development tools:
-   ```bash
-   make tools
-   ```
+1/ Install development tools:
 
-2. Generate protobuf code:
-   ```bash
-   make proto
-   ```
+```bash
+make tools
+```
 
-3. Start the development environment:
-   ```bash
-   make run
-   ```
+2/ Generate protobuf code:
+
+```bash
+make proto
+```
+
+3/ Start the development environment:
+
+```bash
+make run
+```
 
 ### Environment Variables
 
 Create a `.env` file with the following variables:
+
 ```bash
 OPENAI_API_KEY=your_openai_key
 PINECONE_API_KEY=your_pinecone_key
 PINECONE_ENVIRONMENT=your_pinecone_env
-READY_PLAYER_ME_API_KEY=your_rpm_key
+VROID_HUB_API_KEY=your_vroid_key
 DID_API_KEY=your_did_key
 ```
 
@@ -63,9 +67,10 @@ DID_API_KEY=your_did_key
 
 ### Chat
 
-WebSocket endpoint: `wss://chat-gw.careerup.ai/ws`
+WebSocket endpoint: `<wss://chat-gw.careerup.ai/ws>`
 
 Message format:
+
 ```json
 // Client → Server
 {
@@ -87,17 +92,9 @@ Message format:
 
 ## Observability
 
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000
-- Tempo: http://localhost:3200
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+- Prometheus: <http://localhost:9090>
+- Grafana: <http://localhost:3000>
+- Tempo: <http://localhost:3200>
 
 ## License
 

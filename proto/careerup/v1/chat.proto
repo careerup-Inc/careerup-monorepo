@@ -6,14 +6,14 @@ option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/v1;v1";
 option java_package = "com.careerup.proto.v1";
 option java_multiple_files = true;
 
-// TokenRequest represents a single token in the conversation stream
-message TokenRequest {
+// StreamRequest represents a single token in the conversation stream
+message StreamRequest {
   string conversation_id = 1;
   string text = 2;
 }
 
-// TokenResponse represents a response from the LLM
-message TokenResponse {
+// StreamResponse represents a response from the LLM
+message StreamResponse {
   oneof response {
     string token = 1;
     string avatar_url = 2;
@@ -22,7 +22,7 @@ message TokenResponse {
 
 // ConversationService handles the chat stream
 service ConversationService {
-  rpc Stream(stream TokenRequest) returns (stream TokenResponse) {}
+  rpc Stream(stream StreamRequest) returns (stream StreamResponse) {}
 }
 
 // WebSocketMessage represents the JSON structure for WebSocket communication

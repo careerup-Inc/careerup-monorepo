@@ -26,6 +26,11 @@ message RegisterRequest {
   string last_name = 4;
 }
 
+// RegisterResponse contains the newly created user
+message RegisterResponse {
+  User user = 1;
+}
+
 // LoginRequest is used to authenticate a user
 message LoginRequest {
   string email = 1;
@@ -49,18 +54,28 @@ message ValidateTokenResponse {
 
 // AuthService handles user authentication
 service AuthService {
-  rpc Register(RegisterRequest) returns (User) {}
+  rpc Register(RegisterRequest) returns (RegisterResponse) {}
   rpc Login(LoginRequest) returns (LoginResponse) {}
-  rpc GetCurrentUser(GetCurrentUserRequest) returns (User) {}
-  rpc UpdateUser(UpdateUserRequest) returns (User) {}
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse) {}
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {}
 }
 
 message GetCurrentUserRequest {}
+
+// GetCurrentUserResponse contains the current user
+message GetCurrentUserResponse {
+  User user = 1;
+}
 
 message UpdateUserRequest {
   string first_name = 1;
   string last_name = 2;
   string hometown = 3;
   repeated string interests = 4;
-} 
+}
+
+// UpdateUserResponse contains the updated user
+message UpdateUserResponse {
+  User user = 1;
+}
