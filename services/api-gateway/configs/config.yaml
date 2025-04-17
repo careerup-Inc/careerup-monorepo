@@ -1,0 +1,25 @@
+server:
+  port: 8080
+  read_timeout: 10s
+  write_timeout: 10s
+  idle_timeout: 120s
+
+auth:
+  service_addr: "auth-core:8081"
+  jwt_secret: "your-jwt-secret-key"
+  access_token_ttl: 15m
+  refresh_token_ttl: 7d
+
+chat:
+  service_addr: "chat-gateway:8082"
+
+rate_limit:
+  enabled: true
+  requests_per_minute: 100
+  redis_addr: "redis:6379"
+
+tracing:
+  enabled: true
+  service_name: "api-gateway"
+  endpoint: "tempo:4317"
+  insecure: true 

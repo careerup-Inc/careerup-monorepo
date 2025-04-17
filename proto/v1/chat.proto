@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package careerup.v1;
+
+option go_package = "github.com/careerup/proto/v1;v1";
+option java_package = "com.careerup.proto.v1";
+option java_multiple_files = true;
+
+// TokenRequest represents a single token in the conversation stream
+message TokenRequest {
+  string conversation_id = 1;
+  string text = 2;
+}
+
+// TokenResponse represents a response from the LLM
+message TokenResponse {
+  oneof response {
+    string token = 1;
+    string avatar_url = 2;
+  }
+}
+
+// ConversationService handles the chat stream
+service ConversationService {
+  rpc Stream(stream TokenRequest) returns (stream TokenResponse) {}
+}
+
+// WebSocketMessage represents the JSON structure for WebSocket communication
+message WebSocketMessage {
+  string type = 1;
+  oneof payload {
+    UserMessage user_message = 2;
+    AssistantToken assistant_token = 3;
+    AvatarUrl avatar_url = 4;
+  }
+}
+
+message UserMessage {
+  string conversation_id = 1;
+  string text = 2;
+}
+
+message AssistantToken {
+  string token = 1;
+}
+
+message AvatarUrl {
+  string url = 1;
+} 
