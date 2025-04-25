@@ -7,7 +7,10 @@ import com.careerup.authcore.model.dto.RegisterRequest;
 import com.careerup.authcore.model.dto.TokenResponse;
 import com.careerup.authcore.model.dto.UpdateUserRequest;
 import com.careerup.authcore.service.AuthService;
+
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import com.careerup.authcore.model.dto.UserDTO;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -72,10 +75,34 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/validate")
-    public ResponseEntity<User> validateToken(@RequestParam("token") String token) {
-        User user = authService.validateToken(token);
-        return ResponseEntity.ok(user);
+    @GetMapping("/validate")
+    public ResponseEntity<UserDTO> validateToken(HttpServletRequest request) {
+        // Extract token from Authorization header
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        String token = authHeader.substring(7);
+        
+        try {
+            // Call the service to validate the token
+            User user = authService.validateToken(token);
+            
+            // Convert to DTO for response
+            UserDTO userDTO = new UserDTO();
+            userDTO.setId(user.getId());
+            userDTO.setEmail(user.getEmail());
+            userDTO.setFirstName(user.getFirstName());
+            userDTO.setLastName(user.getLastName());
+            userDTO.setHometown(user.getHometown());
+            userDTO.setInterests(user.getInterests());
+            userDTO.setIsActive(true);
+            
+            return ResponseEntity.ok(userDTO);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
     }
 
     @GetMapping("/me")

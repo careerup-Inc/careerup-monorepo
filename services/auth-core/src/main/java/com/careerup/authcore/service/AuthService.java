@@ -88,6 +88,16 @@ public class AuthService {
 
     public User validateToken(String token) {
         String email = jwtService.extractUsername(token);
+        
+        // Verify token is valid
+        UserDetails userDetails = userRepository.findByEmail(email)
+            .map(user -> new UserDetailsImpl(user))
+            .orElseThrow(() -> new RuntimeException("User not found"));
+            
+        if (!jwtService.isTokenValid(token, userDetails)) {
+            throw new RuntimeException("Invalid token");
+        }
+        
         return userRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("User not found"));
     }
