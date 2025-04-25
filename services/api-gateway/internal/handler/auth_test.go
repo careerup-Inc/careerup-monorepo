@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -21,48 +22,48 @@ func NewMockAuthClient() *MockAuthClient {
 	return &MockAuthClient{}
 }
 
-func (m *MockAuthClient) Register(req *client.RegisterRequest) (*client.User, error) {
-	args := m.Called(req)
+func (m *MockAuthClient) Register(ctx context.Context, req *client.RegisterRequest) (*client.User, error) {
+	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*client.User), args.Error(1)
 }
 
-func (m *MockAuthClient) Login(req *client.LoginRequest) (*client.TokenResponse, error) {
-	args := m.Called(req)
+func (m *MockAuthClient) Login(ctx context.Context, req *client.LoginRequest) (*client.TokenResponse, error) {
+	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*client.TokenResponse), args.Error(1)
 }
 
-func (m *MockAuthClient) RefreshToken(refreshToken string) (*client.TokenResponse, error) {
-	args := m.Called(refreshToken)
+func (m *MockAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*client.TokenResponse, error) {
+	args := m.Called(ctx, refreshToken)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*client.TokenResponse), args.Error(1)
 }
 
-func (m *MockAuthClient) ValidateToken(token string) (*client.User, error) {
-	args := m.Called(token)
+func (m *MockAuthClient) ValidateToken(ctx context.Context, token string) (*client.User, error) {
+	args := m.Called(ctx, token)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*client.User), args.Error(1)
 }
 
-func (m *MockAuthClient) GetCurrentUser(token string) (*client.User, error) {
-	args := m.Called(token)
+func (m *MockAuthClient) GetCurrentUser(ctx context.Context, token string) (*client.User, error) {
+	args := m.Called(ctx, token)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*client.User), args.Error(1)
 }
 
-func (m *MockAuthClient) UpdateUser(token string, req *client.UpdateUserRequest) (*client.User, error) {
-	args := m.Called(token, req)
+func (m *MockAuthClient) UpdateUser(ctx context.Context, req *client.UpdateUserRequest) (*client.User, error) {
+	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -95,7 +96,7 @@ func TestAuthHandler_Register(t *testing.T) {
 			IsActive:  true,
 		}
 
-		mockClient.On("Register", mock.Anything).Return(expectedUser, nil)
+		mockClient.On("Register", mock.Anything, mock.Anything).Return(expectedUser, nil)
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
@@ -122,7 +123,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewReader(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
 
-		mockClient.On("Register", mock.Anything).Return(nil, fiber.NewError(fiber.StatusBadRequest, "Invalid request body"))
+		mockClient.On("Register", mock.Anything, mock.Anything).Return(nil, fiber.NewError(fiber.StatusBadRequest, "Invalid request body"))
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
@@ -152,7 +153,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			ExpiresIn:    3600,
 		}
 
-		mockClient.On("Login", mock.Anything).Return(expectedToken, nil)
+		mockClient.On("Login", mock.Anything, mock.Anything).Return(expectedToken, nil)
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
@@ -180,7 +181,7 @@ func TestAuthHandler_Login(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(jsonBody))
 		req.Header.Set("Content-Type", "application/json")
 
-		mockClient.On("Login", mock.Anything).Return(nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid credentials"))
+		mockClient.On("Login", mock.Anything, mock.Anything).Return(nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid credentials"))
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
@@ -206,7 +207,7 @@ func TestAuthHandler_ValidateToken(t *testing.T) {
 			IsActive:  true,
 		}
 
-		mockClient.On("ValidateToken", "valid_token").Return(expectedUser, nil)
+		mockClient.On("ValidateToken", mock.Anything, "valid_token").Return(expectedUser, nil)
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)
@@ -231,7 +232,7 @@ func TestAuthHandler_ValidateToken(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/validate", nil)
 		req.Header.Set("Authorization", "Bearer invalid_token")
 
-		mockClient.On("ValidateToken", "invalid_token").Return(nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid token"))
+		mockClient.On("ValidateToken", mock.Anything, "invalid_token").Return(nil, fiber.NewError(fiber.StatusUnauthorized, "Invalid token"))
 
 		resp, err := app.Test(req)
 		assert.NoError(t, err)

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package careerup.v1;
 
-option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/v1;v1";
+option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1;careerupv1";
 option java_package = "com.careerup.proto.v1";
 option java_multiple_files = true;
 
@@ -16,6 +16,7 @@ message User {
   repeated string interests = 6;
   string created_at = 7;
   string updated_at = 8;
+  bool is_active = 9;
 }
 
 // RegisterRequest is used to create a new user
@@ -42,6 +43,7 @@ message LoginResponse {
   string access_token = 1;
   string refresh_token = 2;
   User user = 3;
+  int64 expire_in = 4;
 }
 
 message ValidateTokenRequest {
@@ -52,16 +54,32 @@ message ValidateTokenResponse {
   User user = 1;
 }
 
+// RefreshTokenRequest is used to refresh the authentication token
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// RefreshTokenResponse contains the new authentication tokens
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  User user = 3;
+  int64 expire_in = 4;
+}
+
 // AuthService handles user authentication
 service AuthService {
   rpc Register(RegisterRequest) returns (RegisterResponse) {}
   rpc Login(LoginRequest) returns (LoginResponse) {}
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {}
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {}
   rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse) {}
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
-  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {}
 }
 
-message GetCurrentUserRequest {}
+message GetCurrentUserRequest {
+  string token = 1;
+}
 
 // GetCurrentUserResponse contains the current user
 message GetCurrentUserResponse {
@@ -69,10 +87,11 @@ message GetCurrentUserResponse {
 }
 
 message UpdateUserRequest {
-  string first_name = 1;
-  string last_name = 2;
-  string hometown = 3;
-  repeated string interests = 4;
+  string token = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string hometown = 4;
+  repeated string interests = 5;
 }
 
 // UpdateUserResponse contains the updated user

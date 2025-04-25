@@ -1,31 +1,50 @@
 package client
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"net/http"
+	"log"
+	"time"
+
+	pb "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type AuthClientInterface interface {
-	Register(req *RegisterRequest) (*User, error)
-	Login(req *LoginRequest) (*TokenResponse, error)
-	RefreshToken(refreshToken string) (*TokenResponse, error)
-	ValidateToken(token string) (*User, error)
-	GetCurrentUser(token string) (*User, error)
-	UpdateUser(token string, req *UpdateUserRequest) (*User, error)
+	Register(ctx context.Context, req *RegisterRequest) (*User, error)
+	Login(ctx context.Context, req *LoginRequest) (*TokenResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error)
+	ValidateToken(ctx context.Context, token string) (*User, error)
+	GetCurrentUser(ctx context.Context, token string) (*User, error)
+	UpdateUser(ctx context.Context, req *UpdateUserRequest) (*User, error)
 }
 
 type AuthClient struct {
-	baseURL string
-	client  *http.Client
+	conn   *grpc.ClientConn
+	client pb.AuthServiceClient
 }
 
-func NewAuthClient(baseURL string) *AuthClient {
-	return &AuthClient{
-		baseURL: baseURL,
-		client:  &http.Client{},
+func NewAuthClient(addr string) (*AuthClient, error) {
+	// Set up connection with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("Failed to connect to auth service: %v", err)
 	}
+
+	return &AuthClient{
+		conn:   conn,
+		client: pb.NewAuthServiceClient(conn),
+	}, nil
+}
+
+func (c *AuthClient) Close() error {
+	return c.conn.Close()
 }
 
 type RegisterRequest struct {
@@ -47,184 +66,146 @@ type TokenResponse struct {
 }
 
 type User struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	IsActive  bool   `json:"isActive"`
-}
-
-type UpdateUserRequest struct {
-	FirstName string   `json:"first_name"`
-	LastName  string   `json:"last_name"`
+	ID        string   `json:"id"`
+	Email     string   `json:"email"`
+	FirstName string   `json:"firstName"`
+	LastName  string   `json:"lastName"`
+	IsActive  bool     `json:"isActive"`
 	Hometown  string   `json:"hometown"`
 	Interests []string `json:"interests"`
 }
 
-func (c *AuthClient) Register(req *RegisterRequest) (*User, error) {
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %v", err)
-	}
-
-	resp, err := c.client.Post(
-		c.baseURL+"/api/v1/auth/register",
-		"application/json",
-		bytes.NewBuffer(body),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	var user User
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return &user, nil
+type UpdateUserRequest struct {
+	Token     string   `json:"token"`
+	FirstName string   `json:"firstName"`
+	LastName  string   `json:"lastName"`
+	Hometown  string   `json:"hometown"`
+	Interests []string `json:"interests"`
 }
 
-func (c *AuthClient) Login(req *LoginRequest) (*TokenResponse, error) {
-	body, err := json.Marshal(req)
+func (c *AuthClient) Register(ctx context.Context, req *RegisterRequest) (*User, error) {
+	if req.Email == "" || req.Password == "" {
+		return nil, fmt.Errorf("email and password are required")
+	}
+
+	resp, err := c.client.Register(ctx, &pb.RegisterRequest{
+		Email:     req.Email,
+		Password:  req.Password,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %v", err)
+		return nil, err
 	}
 
-	resp, err := c.client.Post(
-		c.baseURL+"/api/v1/auth/login",
-		"application/json",
-		bytes.NewBuffer(body),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	var tokenResp TokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return &tokenResp, nil
+	return convertProtoUser(resp.User), nil
 }
 
-func (c *AuthClient) RefreshToken(refreshToken string) (*TokenResponse, error) {
-	reqBody := map[string]string{
-		"refreshToken": refreshToken,
+func (c *AuthClient) Login(ctx context.Context, req *LoginRequest) (*TokenResponse, error) {
+	// Validate input
+	if req.Email == "" || req.Password == "" {
+		return nil, fmt.Errorf("email and password are required")
 	}
-	body, err := json.Marshal(reqBody)
+
+	resp, err := c.client.Login(ctx, &pb.LoginRequest{
+		Email:    req.Email,
+		Password: req.Password,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %v", err)
+		return nil, err
 	}
 
-	resp, err := c.client.Post(
-		c.baseURL+"/api/v1/auth/refresh",
-		"application/json",
-		bytes.NewBuffer(body),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	var tokenResp TokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return &tokenResp, nil
+	return &TokenResponse{
+		AccessToken:  resp.AccessToken,
+		RefreshToken: resp.RefreshToken,
+		ExpiresIn:    resp.ExpireIn,
+	}, nil
 }
 
-func (c *AuthClient) ValidateToken(token string) (*User, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/auth/validate", nil)
+func (c *AuthClient) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
+
+	if refreshToken == "" {
+		return nil, fmt.Errorf("refresh token is required")
+	}
+
+	resp, err := c.client.RefreshToken(ctx, &pb.RefreshTokenRequest{
+		RefreshToken: refreshToken,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	var user User
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return &user, nil
+	return &TokenResponse{
+		AccessToken:  resp.AccessToken,
+		RefreshToken: resp.RefreshToken,
+		ExpiresIn:    resp.ExpireIn,
+	}, nil
 }
 
-func (c *AuthClient) GetCurrentUser(token string) (*User, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/profile", nil)
+func (c *AuthClient) ValidateToken(ctx context.Context, token string) (*User, error) {
+	if token == "" {
+		return nil, fmt.Errorf("token is required")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	resp, err := c.client.ValidateToken(ctx, &pb.ValidateTokenRequest{
+		Token: token,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	var user User
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return &user, nil
+	return convertProtoUser(resp.User), nil
 }
 
-func (c *AuthClient) UpdateUser(token string, req *UpdateUserRequest) (*User, error) {
-	body, err := json.Marshal(req)
+func (c *AuthClient) GetCurrentUser(ctx context.Context, token string) (*User, error) {
+	if token == "" {
+		return nil, fmt.Errorf("token is required")
+	}
+
+	resp, err := c.client.GetCurrentUser(ctx, &pb.GetCurrentUserRequest{
+		Token: token,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %v", err)
+		return nil, err
 	}
 
-	httpReq, err := http.NewRequest("PUT", c.baseURL+"/api/v1/profile", bytes.NewBuffer(body))
+	return convertProtoUser(resp.User), nil
+}
+
+func (c *AuthClient) UpdateUser(ctx context.Context, req *UpdateUserRequest) (*User, error) {
+	if req.FirstName == "" && req.LastName == "" && req.Hometown == "" && len(req.Interests) == 0 {
+		return nil, fmt.Errorf("at least one field is required to update")
+	}
+
+	if req.Token == "" {
+		return nil, fmt.Errorf("token is required")
+	}
+
+	resp, err := c.client.UpdateUser(ctx, &pb.UpdateUserRequest{
+		Token:     req.Token,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Hometown:  req.Hometown,
+		Interests: req.Interests,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, err
 	}
 
-	httpReq.Header.Set("Authorization", "Bearer "+token)
-	httpReq.Header.Set("Content-Type", "application/json")
-	resp, err := c.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %v", err)
-	}
-	defer resp.Body.Close()
+	return convertProtoUser(resp.User), nil
+}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+func convertProtoUser(protoUser *pb.User) *User {
+	return &User{
+		ID:        protoUser.Id,
+		Email:     protoUser.Email,
+		FirstName: protoUser.FirstName,
+		LastName:  protoUser.LastName,
+		Hometown:  protoUser.Hometown,
+		Interests: protoUser.Interests,
+		IsActive:  protoUser.IsActive,
 	}
-
-	var user User
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return &user, nil
 }

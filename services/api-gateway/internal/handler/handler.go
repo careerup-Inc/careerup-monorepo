@@ -61,6 +61,7 @@ type LoginRequest struct {
 }
 
 type UpdateUserRequest struct {
+	Token     string   `json:"token" binding:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 	FirstName string   `json:"first_name" example:"John"`
 	LastName  string   `json:"last_name" example:"Doe"`
 	Hometown  string   `json:"hometown" example:"New York"`
@@ -90,12 +91,13 @@ func (h *Handler) HandleRegister(c *fiber.Ctx) error {
 	}
 
 	// Call auth service to register user
-	user, err := h.authClient.Register(&client.RegisterRequest{
+	user, err := h.authClient.Register(c.Context(), &client.RegisterRequest{
 		Email:     req.Email,
 		Password:  req.Password,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 	})
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
@@ -123,7 +125,7 @@ func (h *Handler) HandleLogin(c *fiber.Ctx) error {
 		})
 	}
 
-	loginResp, err := h.authClient.Login(&client.LoginRequest{
+	loginResp, err := h.authClient.Login(c.Context(), &client.LoginRequest{
 		Email:    req.Email,
 		Password: req.Password,
 	})
@@ -153,7 +155,7 @@ func (h *Handler) HandleGetProfile(c *fiber.Ctx) error {
 		})
 	}
 
-	user, err := h.authClient.GetCurrentUser(token)
+	user, err := h.authClient.GetCurrentUser(c.Context(), token)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
@@ -190,7 +192,8 @@ func (h *Handler) HandleUpdateProfile(c *fiber.Ctx) error {
 		})
 	}
 
-	user, err := h.authClient.UpdateUser(token, &client.UpdateUserRequest{
+	user, err := h.authClient.UpdateUser(c.Context(), &client.UpdateUserRequest{
+		Token:     req.Token,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Hometown:  req.Hometown,
@@ -222,7 +225,7 @@ func (h *Handler) HandleWebSocket(c *fiber.Ctx) error {
 	}
 
 	// Validate token
-	_, err := h.authClient.ValidateToken(token)
+	_, err := h.authClient.ValidateToken(c.Context(), token)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid token",
@@ -257,7 +260,7 @@ func (h *Handler) HandleValidateToken(c *fiber.Ctx) error {
 		})
 	}
 
-	user, err := h.authClient.ValidateToken(req.Token)
+	user, err := h.authClient.ValidateToken(c.Context(), req.Token)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid token",

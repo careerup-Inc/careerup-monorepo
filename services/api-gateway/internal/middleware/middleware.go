@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"time"
 
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
@@ -41,12 +42,16 @@ func RateLimitInMemory() fiber.Handler {
 // Auth middleware
 func Auth(authClient *client.AuthClient) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		// Create context with timeout for the gRPC call
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
 		token := c.Get("Authorization")
 		if token == "" {
 			return c.Next()
 		}
 
-		user, err := authClient.ValidateToken(token)
+		user, err := authClient.ValidateToken(ctx, token)
 		if err != nil {
 			return c.Next()
 		}

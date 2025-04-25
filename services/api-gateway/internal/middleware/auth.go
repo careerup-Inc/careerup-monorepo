@@ -1,14 +1,13 @@
 package middleware
 
 import (
-	"fmt"
+	"context"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -22,20 +21,19 @@ func init() {
 	if authServiceAddr == "" {
 		authServiceAddr = "auth-core:8081" // Default value
 	}
-	authClientInstance = client.NewAuthClient("http://" + authServiceAddr)
+	client, err := client.NewAuthClient("http://" + authServiceAddr)
+	if err != nil {
+		panic("Failed to create auth client: " + err.Error())
+	}
+	authClientInstance = client
 }
 
 func AuthMiddleware(authClient *client.AuthClient) fiber.Handler {
-	// Get JWT secret from environment variables
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		// if not found then panic
-		panic("JWT_SECRET environment variable is not set")
-	}
-
-	secretBytes := []byte(jwtSecret)
-
 	return func(c *fiber.Ctx) error {
+		// Create context with timeout for the gRPC call
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -60,35 +58,8 @@ func AuthMiddleware(authClient *client.AuthClient) fiber.Handler {
 			return c.Next()
 		}
 
-		// Basic format validation before calling auth-core
-		if !isValidTokenFormat(tokenString) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid token format",
-			})
-		}
-
-		// Parse and validate the token using the environment variable
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Validate the alg is what you expect
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-			}
-			return secretBytes, nil
-		})
-
-		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid token",
-			})
-		}
-
-		if !token.Valid {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Token is invalid",
-			})
-		}
-
-		user, err := authClientInstance.ValidateToken(tokenString)
+		// Use gRPC client to validate token against auth service
+		user, err := authClient.ValidateToken(ctx, tokenString)
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid token",
@@ -103,9 +74,4 @@ func AuthMiddleware(authClient *client.AuthClient) fiber.Handler {
 
 		return c.Next()
 	}
-}
-
-func isValidTokenFormat(tokenString string) bool {
-	parts := strings.Split(tokenString, ".")
-	return len(parts) == 3
 }

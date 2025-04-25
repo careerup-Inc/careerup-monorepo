@@ -23,7 +23,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
-	user, err := h.authClient.Register(&client.RegisterRequest{
+	user, err := h.authClient.Register(c.Context(), &client.RegisterRequest{
 		Email:     req.Email,
 		Password:  req.Password,
 		FirstName: req.FirstName,
@@ -55,7 +55,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		})
 	}
 
-	tokens, err := h.authClient.Login(&req)
+	tokens, err := h.authClient.Login(c.Context(), &req)
 	if err != nil {
 		// Check for specific status code in the error if it's a Fiber error
 		if fiberErr, ok := err.(*fiber.Error); ok {
@@ -83,7 +83,7 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 		})
 	}
 
-	tokens, err := h.authClient.RefreshToken(req.RefreshToken)
+	tokens, err := h.authClient.RefreshToken(c.Context(), req.RefreshToken)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid refresh token",
@@ -107,7 +107,7 @@ func (h *AuthHandler) ValidateToken(c *fiber.Ctx) error {
 		token = authHeader[7:]
 	}
 
-	user, err := h.authClient.ValidateToken(token)
+	user, err := h.authClient.ValidateToken(c.Context(), token)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid token",

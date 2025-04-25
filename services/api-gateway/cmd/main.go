@@ -60,7 +60,11 @@ func main() {
 	})
 
 	// Initialize auth client
-	authClient := client.NewAuthClient("http://" + os.Getenv("AUTH_SERVICE_ADDR"))
+	authClient, err := client.NewAuthClient("http://" + os.Getenv("AUTH_SERVICE_ADDR"))
+
+	if err != nil {
+		log.Fatalf("Failed to create auth client: %v", err)
+	}
 
 	// Initialize middlewares with auth client
 	authMiddleware := middleware.AuthMiddleware(authClient)
