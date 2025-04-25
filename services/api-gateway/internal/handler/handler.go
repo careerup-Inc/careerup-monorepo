@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 
-	v1 "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/gorilla/websocket"
 )
 
@@ -82,21 +80,29 @@ type ValidateTokenRequest struct {
 // @Success 201 {object} User
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /register [post]
-func (h *Handler) Register(c *gin.Context) {
+// @Router /api/v1/auth/register [post]
+func (h *Handler) HandleRegister(c *fiber.Ctx) error {
 	var req RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	user, err := h.authClient.Register(c.Request.Context(), req.Email, req.Password, req.FirstName, req.LastName)
+	// Call auth service to register user
+	user, err := h.authClient.Register(&client.RegisterRequest{
+		Email:     req.Email,
+		Password:  req.Password,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to register user"})
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	c.JSON(http.StatusCreated, user)
+	return c.Status(fiber.StatusCreated).JSON(user)
 }
 
 // @Summary Login user
@@ -108,21 +114,26 @@ func (h *Handler) Register(c *gin.Context) {
 // @Success 200 {object} LoginResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
-// @Router /login [post]
-func (h *Handler) Login(c *gin.Context) {
+// @Router /api/v1/auth/login [post]
+func (h *Handler) HandleLogin(c *fiber.Ctx) error {
 	var req LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	resp, err := h.authClient.Login(c.Request.Context(), req.Email, req.Password)
+	loginResp, err := h.authClient.Login(&client.LoginRequest{
+		Email:    req.Email,
+		Password: req.Password,
+	})
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid credentials"})
-		return
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid credentials",
+		})
 	}
 
-	c.JSON(http.StatusOK, resp)
+	return c.Status(fiber.StatusOK).JSON(loginResp)
 }
 
 // @Summary Get current user
@@ -133,21 +144,23 @@ func (h *Handler) Login(c *gin.Context) {
 // @Success 200 {object} User
 // @Failure 401 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /me [get]
-func (h *Handler) GetCurrentUser(c *gin.Context) {
-	userID := c.GetString("user_id")
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "user not authenticated"})
-		return
+// @Router /api/v1/profile [get]
+func (h *Handler) HandleGetProfile(c *fiber.Ctx) error {
+	token := c.Get("Authorization")
+	if token == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authorization token required",
+		})
 	}
 
-	user, err := h.authClient.GetCurrentUser(c.Request.Context(), userID)
+	user, err := h.authClient.GetCurrentUser(token)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to get user"})
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	c.JSON(http.StatusOK, user)
+	return c.Status(fiber.StatusOK).JSON(user)
 }
 
 // @Summary Update current user
@@ -161,34 +174,35 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /me [put]
-func (h *Handler) UpdateUser(c *gin.Context) {
-	userID := c.GetString("user_id")
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "user not authenticated"})
-		return
+// @Router /api/v1/profile [put]
+func (h *Handler) HandleUpdateProfile(c *fiber.Ctx) error {
+	token := c.Get("Authorization")
+	if token == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authorization token required",
+		})
 	}
 
 	var req UpdateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	updateReq := &v1.UpdateUserRequest{
+	user, err := h.authClient.UpdateUser(token, &client.UpdateUserRequest{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Hometown:  req.Hometown,
 		Interests: req.Interests,
-	}
-
-	user, err := h.authClient.UpdateUser(c.Request.Context(), userID, updateReq)
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to update user"})
-		return
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	c.JSON(http.StatusOK, user)
+	return c.Status(fiber.StatusOK).JSON(user)
 }
 
 // @Summary WebSocket chat
@@ -198,48 +212,31 @@ func (h *Handler) UpdateUser(c *gin.Context) {
 // @Success 101 {string} string "Switching Protocols"
 // @Failure 401 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /ws [get]
-func (h *Handler) WebSocket(c *gin.Context) {
-	userID := c.GetString("user_id")
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "user not authenticated"})
-		return
+// @Router /api/v1/ws [get]
+func (h *Handler) HandleWebSocket(c *fiber.Ctx) error {
+	token := c.Get("Authorization")
+	if token == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authorization token required",
+		})
 	}
 
-	// Upgrade HTTP connection to WebSocket
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	// Validate token
+	_, err := h.authClient.ValidateToken(token)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to upgrade connection"})
-		return
-	}
-	defer conn.Close()
-
-	// Create gRPC stream
-	stream, err := h.chatClient.Stream(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "failed to create chat stream"})
-		return
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid token",
+		})
 	}
 
-	// Handle WebSocket messages
-	for {
-		var msg v1.WebSocketMessage
-		if err := conn.ReadJSON(&msg); err != nil {
-			log.Printf("Failed to read WebSocket message: %v", err)
-			break
-		}
-
-		switch msg.Type {
-		case "user_msg":
-			if err := stream.Send(&v1.StreamRequest{
-				ConversationId: msg.GetUserMessage().ConversationId,
-				Text:           msg.GetUserMessage().Text,
-			}); err != nil {
-				log.Printf("Failed to send message: %v", err)
-				break
-			}
-		}
+	// Upgrade to WebSocket connection
+	if err := h.chatClient.UpgradeToWebSocket(c); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to upgrade to WebSocket",
+		})
 	}
+
+	return nil
 }
 
 // @Summary Validate token
@@ -251,19 +248,21 @@ func (h *Handler) WebSocket(c *gin.Context) {
 // @Success 200 {object} User
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
-// @Router /auth/validate [post]
-func (h *Handler) ValidateToken(c *gin.Context) {
+// @Router /api/v1/auth/validate [post]
+func (h *Handler) HandleValidateToken(c *fiber.Ctx) error {
 	var req ValidateTokenRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
-		return
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
 	}
 
-	user, err := h.authClient.ValidateToken(c.Request.Context(), req.Token)
+	user, err := h.authClient.ValidateToken(req.Token)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid token"})
-		return
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid token",
+		})
 	}
 
-	c.JSON(http.StatusOK, user)
+	return c.Status(fiber.StatusOK).JSON(user)
 }

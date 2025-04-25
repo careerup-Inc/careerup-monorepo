@@ -1,72 +1,70 @@
 package middleware
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"golang.org/x/time/rate"
 )
 
 // CORS middleware
-func CORS() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+func CORS() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		c.Set("Access-Control-Allow-Origin", "*")
+		c.Set("Access-Control-Allow-Credentials", "true")
+		c.Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
+		if c.Method() == "OPTIONS" {
+			return c.SendStatus(204)
 		}
 
-		c.Next()
+		return c.Next()
 	}
 }
 
-// RateLimit middleware
-func RateLimit() gin.HandlerFunc {
+// RateLimitInMemory middleware
+func RateLimitInMemory() fiber.Handler {
 	limiter := rate.NewLimiter(rate.Every(time.Second), 10) // 10 requests per second
 
-	return func(c *gin.Context) {
+	return func(c *fiber.Ctx) error {
 		if !limiter.Allow() {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
-			return
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "rate limit exceeded",
+			})
 		}
-		c.Next()
+		return c.Next()
 	}
 }
 
 // Auth middleware
-func Auth(authClient *client.AuthClient) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		token := c.GetHeader("Authorization")
+func Auth(authClient *client.AuthClient) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		token := c.Get("Authorization")
 		if token == "" {
-			c.Next()
-			return
+			return c.Next()
 		}
 
-		user, err := authClient.ValidateToken(c.Request.Context(), token)
+		user, err := authClient.ValidateToken(token)
 		if err != nil {
-			c.Next()
-			return
+			return c.Next()
 		}
 
-		c.Set("user_id", user.Id)
-		c.Next()
+		c.Locals("user_id", user.ID)
+		return c.Next()
 	}
 }
 
 // RequireAuth middleware
-func RequireAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := c.GetString("user_id")
-		if userID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
-			return
+func RequireAuth() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userID := c.Locals("user_id")
+		if userID == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "authentication required",
+			})
 		}
-		c.Next()
+		return c.Next()
 	}
 }

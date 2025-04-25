@@ -2,15 +2,16 @@ package main
 
 import (
 	"log"
-	"net/http"
+	"os"
 
-	_ "github.com/careerup-Inc/careerup-monorepo/services/api-gateway/docs"
+	"github.com/arsmn/fiber-swagger/v2"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/docs"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
-	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/middleware"
-	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/joho/godotenv"
 )
 
 // @title CareerUP API
@@ -29,53 +30,68 @@ import (
 // @BasePath /
 // @schemes http
 
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+
 func main() {
-	// Initialize clients
-	authClient, err := client.NewAuthClient("localhost:50051")
-	if err != nil {
-		log.Fatalf("Failed to create auth client: %v", err)
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: .env file not found")
 	}
-	defer authClient.Close()
 
-	chatClient, err := client.NewChatClient("localhost:50052")
-	if err != nil {
-		log.Fatalf("Failed to create chat client: %v", err)
-	}
-	defer chatClient.Close()
+	app := fiber.New()
 
-	// Create handler
-	h := handler.NewHandler(authClient, chatClient)
+	// Middleware
+	app.Use(cors.New())
+	app.Use(logger.New())
 
-	// Initialize router
-	r := gin.Default()
+	// Swagger
+	app.Get("/swagger/*", swagger.New(swagger.Config{
+		URL:         "/swagger/doc.json",
+		DeepLinking: true,
+		Title:       "CareerUP API",
+	}))
 
-	// Add middleware
-	r.Use(middleware.CORS())
-	r.Use(middleware.RateLimit())
-	r.Use(middleware.Auth(authClient))
+	// Serve Swagger JSON
+	app.Get("/swagger/doc.json", func(c *fiber.Ctx) error {
+		return c.JSON(docs.SwaggerInfo)
+	})
 
-	// Swagger documentation
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
-		ginSwagger.URL("http://localhost:8080/swagger/doc.json"),
-		ginSwagger.DefaultModelsExpandDepth(-1),
-	))
+	// Initialize auth client
+	authClient := client.NewAuthClient("http://auth-core:8081")
 
-	// Public routes
-	r.POST("/register", h.Register)
-	r.POST("/login", h.Login)
-	r.POST("/auth/validate", h.ValidateToken)
+	// Initialize handlers
+	authHandler := handler.NewAuthHandler(authClient)
 
-	// Protected routes
-	auth := r.Group("/")
-	auth.Use(middleware.RequireAuth())
+	// Routes
+	api := app.Group("/api/v1")
 	{
-		auth.GET("/me", h.GetCurrentUser)
-		auth.PUT("/me", h.UpdateUser)
-		auth.GET("/ws", h.WebSocket)
+		// Health check
+		api.Get("/health", func(c *fiber.Ctx) error {
+			return c.JSON(fiber.Map{
+				"status": "ok",
+			})
+		})
+
+		// Auth routes
+		auth := api.Group("/auth")
+		{
+			auth.Post("/register", authHandler.Register)
+			auth.Post("/login", authHandler.Login)
+			auth.Post("/refresh", authHandler.RefreshToken)
+			auth.Get("/validate", authHandler.ValidateToken)
+		}
 	}
 
 	// Start server
-	if err := http.ListenAndServe(":8080", r); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Server starting on port %s", port)
+	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

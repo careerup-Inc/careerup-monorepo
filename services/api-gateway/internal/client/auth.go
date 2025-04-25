@@ -1,86 +1,230 @@
 package client
 
 import (
-	"context"
-	"log"
-
-	v1 "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
 )
 
+type AuthClientInterface interface {
+	Register(req *RegisterRequest) (*User, error)
+	Login(req *LoginRequest) (*TokenResponse, error)
+	RefreshToken(refreshToken string) (*TokenResponse, error)
+	ValidateToken(token string) (*User, error)
+	GetCurrentUser(token string) (*User, error)
+	UpdateUser(token string, req *UpdateUserRequest) (*User, error)
+}
+
 type AuthClient struct {
-	client v1.AuthServiceClient
-	conn   *grpc.ClientConn
+	baseURL string
+	client  *http.Client
 }
 
-func NewAuthClient(addr string) (*AuthClient, error) {
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, err
-	}
-
+func NewAuthClient(baseURL string) *AuthClient {
 	return &AuthClient{
-		client: v1.NewAuthServiceClient(conn),
-		conn:   conn,
-	}, nil
-}
-
-func (c *AuthClient) Close() error {
-	return c.conn.Close()
-}
-
-func (c *AuthClient) Register(ctx context.Context, email, password, firstName, lastName string) (*v1.RegisterResponse, error) {
-	resp, err := c.client.Register(ctx, &v1.RegisterRequest{
-		Email:     email,
-		Password:  password,
-		FirstName: firstName,
-		LastName:  lastName,
-	})
-	if err != nil {
-		log.Printf("Failed to register user: %v", err)
-		return nil, err
+		baseURL: baseURL,
+		client:  &http.Client{},
 	}
-	return resp, nil
 }
 
-func (c *AuthClient) Login(ctx context.Context, email, password string) (*v1.LoginResponse, error) {
-	resp, err := c.client.Login(ctx, &v1.LoginRequest{
-		Email:    email,
-		Password: password,
-	})
-	if err != nil {
-		log.Printf("Failed to login user: %v", err)
-		return nil, err
-	}
-	return resp, nil
+type RegisterRequest struct {
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
 }
 
-func (c *AuthClient) GetCurrentUser(ctx context.Context, userID string) (*v1.GetCurrentUserResponse, error) {
-	resp, err := c.client.GetCurrentUser(ctx, &v1.GetCurrentUserRequest{})
-	if err != nil {
-		log.Printf("Failed to get current user: %v", err)
-		return nil, err
-	}
-	return resp, nil
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
-func (c *AuthClient) UpdateUser(ctx context.Context, userID string, req *v1.UpdateUserRequest) (*v1.UpdateUserResponse, error) {
-	resp, err := c.client.UpdateUser(ctx, req)
-	if err != nil {
-		log.Printf("Failed to update user: %v", err)
-		return nil, err
-	}
-	return resp, nil
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
 }
 
-func (c *AuthClient) ValidateToken(ctx context.Context, token string) (*v1.User, error) {
-	resp, err := c.client.ValidateToken(ctx, &v1.ValidateTokenRequest{
-		Token: token,
-	})
+type User struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	IsActive  bool   `json:"isActive"`
+}
+
+type UpdateUserRequest struct {
+	FirstName string   `json:"first_name"`
+	LastName  string   `json:"last_name"`
+	Hometown  string   `json:"hometown"`
+	Interests []string `json:"interests"`
+}
+
+func (c *AuthClient) Register(req *RegisterRequest) (*User, error) {
+	body, err := json.Marshal(req)
 	if err != nil {
-		log.Printf("Failed to validate token: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
-	return resp.User, nil
+
+	resp, err := c.client.Post(
+		c.baseURL+"/api/v1/auth/register",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &user, nil
+}
+
+func (c *AuthClient) Login(req *LoginRequest) (*TokenResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	resp, err := c.client.Post(
+		c.baseURL+"/api/v1/auth/login",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var tokenResp TokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &tokenResp, nil
+}
+
+func (c *AuthClient) RefreshToken(refreshToken string) (*TokenResponse, error) {
+	reqBody := map[string]string{
+		"refreshToken": refreshToken,
+	}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	resp, err := c.client.Post(
+		c.baseURL+"/api/v1/auth/refresh",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var tokenResp TokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &tokenResp, nil
+}
+
+func (c *AuthClient) ValidateToken(token string) (*User, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/auth/validate", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &user, nil
+}
+
+func (c *AuthClient) GetCurrentUser(token string) (*User, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/v1/profile", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &user, nil
+}
+
+func (c *AuthClient) UpdateUser(token string, req *UpdateUserRequest) (*User, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequest("PUT", c.baseURL+"/api/v1/profile", bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &user, nil
 }

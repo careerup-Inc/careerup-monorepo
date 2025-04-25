@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package careerup.v1;
+
+option go_package = "github.com/careerup/monorepo/services/api-gateway/proto/careerup/v1;careerupv1";
+
+// ProfileService handles user profile-related operations
+service ProfileService {
+  // Get a user's profile
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {}
+  
+  // Update a user's profile
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {}
+  
+  // Delete a user's profile
+  rpc DeleteProfile(DeleteProfileRequest) returns (DeleteProfileResponse) {}
+}
+
+// GetProfileRequest represents the request to get a user's profile
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+// GetProfileResponse represents the response containing a user's profile
+message GetProfileResponse {
+  string user_id = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string bio = 5;
+  string avatar_url = 6;
+  repeated string skills = 7;
+  repeated string interests = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+// UpdateProfileRequest represents the request to update a user's profile
+message UpdateProfileRequest {
+  string user_id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string bio = 4;
+  string avatar_url = 5;
+  repeated string skills = 6;
+  repeated string interests = 7;
+}
+
+// UpdateProfileResponse represents the response after successful profile update
+message UpdateProfileResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// DeleteProfileRequest represents the request to delete a user's profile
+message DeleteProfileRequest {
+  string user_id = 1;
+}
+
+// DeleteProfileResponse represents the response after successful profile deletion
+message DeleteProfileResponse {
+  bool success = 1;
+  string message = 2;
+} 

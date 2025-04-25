@@ -1,0 +1,11 @@
+server:
+  port: 9090
+
+deepseek:
+  api-key: ${DEEPSEEK_API_KEY}
+  base-url: https://api.deepseek.com/v1
+  model: deepseek-r1
+
+spring:
+  application:
+    name: llm-gateway 

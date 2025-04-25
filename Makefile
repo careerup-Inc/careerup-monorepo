@@ -37,7 +37,7 @@ clean:
 
 # Run all services locally
 run:
-	docker compose up --build
+	docker compose up --build -d
 
 # Install development tools
 tools:

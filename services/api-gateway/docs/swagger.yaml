@@ -1,12 +1,12 @@
 basePath: /
 definitions:
-  internal_handler.ErrorResponse:
+  handler.ErrorResponse:
     properties:
       error:
         example: error message
         type: string
     type: object
-  internal_handler.LoginRequest:
+  handler.LoginRequest:
     properties:
       email:
         example: user@example.com
@@ -18,7 +18,7 @@ definitions:
     - email
     - password
     type: object
-  internal_handler.LoginResponse:
+  handler.LoginResponse:
     properties:
       access_token:
         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -27,9 +27,9 @@ definitions:
         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         type: string
       user:
-        $ref: '#/definitions/internal_handler.User'
+        $ref: '#/definitions/handler.User'
     type: object
-  internal_handler.RegisterRequest:
+  handler.RegisterRequest:
     properties:
       email:
         example: user@example.com
@@ -50,7 +50,7 @@ definitions:
     - last_name
     - password
     type: object
-  internal_handler.UpdateUserRequest:
+  handler.UpdateUserRequest:
     properties:
       first_name:
         example: John
@@ -69,7 +69,7 @@ definitions:
         example: Doe
         type: string
     type: object
-  internal_handler.User:
+  handler.User:
     properties:
       email:
         example: user@example.com
@@ -94,7 +94,7 @@ definitions:
         example: Doe
         type: string
     type: object
-  internal_handler.ValidateTokenRequest:
+  handler.ValidateTokenRequest:
     properties:
       token:
         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -116,37 +116,7 @@ info:
   title: CareerUP API
   version: "1.0"
 paths:
-  /auth/validate:
-    post:
-      consumes:
-      - application/json
-      description: Validate an authentication token
-      parameters:
-      - description: Token to validate
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/internal_handler.ValidateTokenRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/internal_handler.User'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
-      summary: Validate token
-      tags:
-      - auth
-  /login:
+  /api/v1/auth/login:
     post:
       consumes:
       - application/json
@@ -157,26 +127,86 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handler.LoginRequest'
+          $ref: '#/definitions/handler.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_handler.LoginResponse'
+            $ref: '#/definitions/handler.LoginResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
       summary: Login user
       tags:
       - auth
-  /me:
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user with email and password
+      parameters:
+      - description: Register Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /api/v1/auth/validate:
+    post:
+      consumes:
+      - application/json
+      description: Validate an authentication token
+      parameters:
+      - description: Token to validate
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ValidateTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Validate token
+      tags:
+      - auth
+  /api/v1/profile:
     get:
       description: Get the current authenticated user's profile
       produces:
@@ -185,15 +215,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_handler.User'
+            $ref: '#/definitions/handler.User'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Get current user
@@ -209,62 +239,32 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_handler.UpdateUserRequest'
+          $ref: '#/definitions/handler.UpdateUserRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_handler.User'
+            $ref: '#/definitions/handler.User'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Update current user
       tags:
       - user
-  /register:
-    post:
-      consumes:
-      - application/json
-      description: Register a new user with email and password
-      parameters:
-      - description: Register Request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/internal_handler.RegisterRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/internal_handler.User'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
-      summary: Register a new user
-      tags:
-      - auth
-  /ws:
+  /api/v1/ws:
     get:
       description: WebSocket endpoint for real-time chat
       responses:
@@ -275,11 +275,11 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handler.ErrorResponse'
+            $ref: '#/definitions/handler.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: WebSocket chat
@@ -287,4 +287,9 @@ paths:
       - chat
 schemes:
 - http
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

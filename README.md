@@ -6,12 +6,12 @@ CareerUP is a polyglot, micro-service-oriented backend that mixes Go for ultra-c
 
 The system consists of the following services:
 
-- **api-gateway** (Go/Gin): JWT auth, rate-limit, route to internal gRPC
+- **api-gateway** (Go/Fiber): JWT auth, rate-limit, route to internal gRPC
 - **auth-core** (Java/Spring Boot): Users, profiles, bookings, payments
 - **rec-service** (Java/Quarkus): Recommendation & similarity ML
 - **chat-gateway** (Go/Fiber): Multiplex client WebSockets → LLM
 - **llm-gateway** (Go/LangChainGo): Prompt-orchestration, RAG, OpenAI calls
-- **avatar-service** (Go): VRoid Studio model management & D-ID orchestration, TTS
+- **avatar-service** (Go): VRoid Studio model management
 - **notification** (Go/Fiber): Push alerts via Redis streams
 
 ## Development Setup
