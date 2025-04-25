@@ -1,4 +1,4 @@
-package com.careerup.llmgateway.config;
+package com.careerup.authcore.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,8 +11,8 @@ public class SwaggerConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("LLM API")
-                        .description("LLM service for CareerUP")
+                        .title("Auth Core API")
+                        .description("Authentication service for CareerUP")
                         .version("1.0.0"));
     }
 }
