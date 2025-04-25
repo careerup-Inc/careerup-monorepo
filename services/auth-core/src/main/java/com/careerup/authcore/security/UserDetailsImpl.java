@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.Objects;
+import java.util.Collections;
 
 @Data
 @AllArgsConstructor
@@ -23,6 +25,7 @@ public class UserDetailsImpl implements UserDetails {
     private String lastName;
     private String hometown;
     private List<String> interests;
+    private Collection<? extends GrantedAuthority> authorities;
 
     public static UserDetailsImpl build(User user) {
         return new UserDetailsImpl(
@@ -32,8 +35,17 @@ public class UserDetailsImpl implements UserDetails {
             user.getFirstName(),
             user.getLastName(),
             user.getHometown(),
-            user.getInterests()
+            user.getInterests(),
+            Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
         );
+    }
+
+    public UserDetailsImpl(User user) {
+        this.id = user.getId();
+        this.email = user.getEmail();
+        this.password = user.getPassword();
+        // TODO assign a default role for now - actual role from User entity later
+        this.authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
     @Override
@@ -64,5 +76,18 @@ public class UserDetailsImpl implements UserDetails {
     @Override
     public boolean isEnabled() {
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UserDetailsImpl user = (UserDetailsImpl) o;
+        return Objects.equals(id, user.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 } 

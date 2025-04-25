@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -8,6 +9,15 @@ import (
 )
 
 func AuthMiddleware() fiber.Handler {
+	// Get JWT secret from environment variables
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		// if not found then panic
+		panic("JWT_SECRET environment variable is not set")
+	}
+
+	secretBytes := []byte(jwtSecret)
+
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
@@ -26,10 +36,9 @@ func AuthMiddleware() fiber.Handler {
 		// Extract the token
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// Parse and validate the token
+		// Parse and validate the token using the environment variable
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// TODO: Replace with your actual secret key
-			return []byte("your-256-bit-secret-key-here-must-be-at-least-32-characters"), nil
+			return secretBytes, nil
 		})
 
 		if err != nil {

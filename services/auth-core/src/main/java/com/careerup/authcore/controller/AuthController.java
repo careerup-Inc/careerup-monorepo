@@ -1,12 +1,21 @@
 package com.careerup.authcore.controller;
 
 import com.careerup.authcore.model.User;
+import com.careerup.authcore.model.dto.LoginRequest;
+import com.careerup.authcore.model.dto.RefreshTokenRequest;
+import com.careerup.authcore.model.dto.RegisterRequest;
+import com.careerup.authcore.model.dto.TokenResponse;
+import com.careerup.authcore.model.dto.UpdateUserRequest;
 import com.careerup.authcore.service.AuthService;
 import lombok.RequiredArgsConstructor;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Collections;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -16,45 +25,76 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<User> register(
-        @RequestParam String email,
-        @RequestParam String password,
-        @RequestParam String firstName,
-        @RequestParam String lastName
+        @RequestBody RegisterRequest request
     ) {
-        User user = authService.register(email, password, firstName, lastName);
-        return ResponseEntity.ok(user);
+        User user = authService.register(
+            request.getEmail(),
+            request.getPassword(),
+            request.getFirstName(),
+            request.getLastName()
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(
-        @RequestParam String email,
-        @RequestParam String password
+    public ResponseEntity<Map<String, Object>> login(
+        @RequestBody LoginRequest request
     ) {
-        String token = authService.login(email, password);
-        return ResponseEntity.ok(token);
+        try {
+            TokenResponse tokenResponse = authService.login(request.getEmail(), request.getPassword());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("access_token", tokenResponse.accessToken());
+            response.put("refresh_token", tokenResponse.refreshToken()); 
+            response.put("expires_in", tokenResponse.expiresIn());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<Map<String, Object>> refreshToken(@RequestBody RefreshTokenRequest request) {
+        try {
+            TokenResponse tokenResponse = authService.refreshToken(request.getRefreshToken());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("access_token", tokenResponse.accessToken());
+            response.put("refresh_token", tokenResponse.refreshToken());
+            response.put("expires_in", tokenResponse.expiresIn());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                Collections.singletonMap("error", "Invalid refresh token")
+            );
+        }
     }
 
     @PostMapping("/validate")
-    public ResponseEntity<User> validateToken(@RequestParam String token) {
+    public ResponseEntity<User> validateToken(@RequestParam("token") String token) {
         User user = authService.validateToken(token);
         return ResponseEntity.ok(user);
     }
 
     @GetMapping("/me")
-    public ResponseEntity<User> getCurrentUser(@RequestParam String email) {
+    public ResponseEntity<User> getCurrentUser(@RequestParam("email") String email) {
         User user = authService.getCurrentUser(email);
         return ResponseEntity.ok(user);
     }
 
     @PutMapping("/me")
     public ResponseEntity<User> updateUser(
-        @RequestParam String email,
-        @RequestParam(required = false) String firstName,
-        @RequestParam(required = false) String lastName,
-        @RequestParam(required = false) String hometown,
-        @RequestParam(required = false) List<String> interests
+        @RequestBody UpdateUserRequest request
     ) {
-        User user = authService.updateUser(email, firstName, lastName, hometown, interests);
+        User user = authService.updateUser(
+            request.getEmail(),
+            request.getFirstName(),
+            request.getLastName(),
+            request.getHometown(),
+            request.getInterests()
+        );
         return ResponseEntity.ok(user);
     }
 } 

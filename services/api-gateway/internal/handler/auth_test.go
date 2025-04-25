@@ -70,12 +70,12 @@ func (m *MockAuthClient) UpdateUser(token string, req *client.UpdateUserRequest)
 }
 
 func TestAuthHandler_Register(t *testing.T) {
-	app := fiber.New()
-	mockClient := NewMockAuthClient()
-	handler := NewAuthHandler(mockClient)
-	app.Post("/api/v1/auth/register", handler.Register)
-
 	t.Run("successful registration", func(t *testing.T) {
+		mockClient := NewMockAuthClient()
+		handler := NewAuthHandler(mockClient)
+		app := fiber.New()
+		app.Post("/api/v1/auth/register", handler.Register)
+
 		reqBody := map[string]interface{}{
 			"email":     "test@example.com",
 			"password":  "password123",
@@ -109,6 +109,11 @@ func TestAuthHandler_Register(t *testing.T) {
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
+		mockClient := NewMockAuthClient()
+		handler := NewAuthHandler(mockClient)
+		app := fiber.New()
+		app.Post("/api/v1/auth/register", handler.Register)
+
 		reqBody := map[string]interface{}{
 			"email": "invalid-email",
 		}
@@ -126,12 +131,12 @@ func TestAuthHandler_Register(t *testing.T) {
 }
 
 func TestAuthHandler_Login(t *testing.T) {
-	app := fiber.New()
-	mockClient := NewMockAuthClient()
-	handler := NewAuthHandler(mockClient)
-	app.Post("/api/v1/auth/login", handler.Login)
-
 	t.Run("successful login", func(t *testing.T) {
+		mockClient := NewMockAuthClient()
+		handler := NewAuthHandler(mockClient)
+		app := fiber.New()
+		app.Post("/api/v1/auth/login", handler.Login)
+
 		reqBody := map[string]interface{}{
 			"email":    "test@example.com",
 			"password": "password123",
@@ -161,6 +166,11 @@ func TestAuthHandler_Login(t *testing.T) {
 	})
 
 	t.Run("invalid credentials", func(t *testing.T) {
+		mockClient := NewMockAuthClient()
+		handler := NewAuthHandler(mockClient)
+		app := fiber.New()
+		app.Post("/api/v1/auth/login", handler.Login)
+
 		reqBody := map[string]interface{}{
 			"email":    "test@example.com",
 			"password": "wrongpassword",

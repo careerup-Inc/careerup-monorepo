@@ -1,8 +1,8 @@
-package com.careerup.auth.integration;
+package com.careerup.authcore.integration;
 
-import com.careerup.auth.AuthApplication;
-import com.careerup.auth.model.User;
-import com.careerup.auth.repository.UserRepository;
+import com.careerup.authcore.AuthCoreApplication;
+import com.careerup.authcore.model.User;
+import com.careerup.authcore.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,13 +15,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(classes = AuthApplication.class)
+@SpringBootTest(classes = AuthCoreApplication.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 public class AuthIntegrationTest {
@@ -57,8 +58,7 @@ public class AuthIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value("test@example.com"))
                 .andExpect(jsonPath("$.firstName").value("John"))
-                .andExpect(jsonPath("$.lastName").value("Doe"))
-                .andExpect(jsonPath("$.isActive").value(true));
+                .andExpect(jsonPath("$.lastName").value("Doe"));
     }
 
     @Test
@@ -69,7 +69,7 @@ public class AuthIntegrationTest {
         user.setPassword(passwordEncoder.encode("password123"));
         user.setFirstName("John");
         user.setLastName("Doe");
-        user.setActive(true);
+        user.setCreatedAt(LocalDateTime.now());
         userRepository.save(user);
 
         Map<String, String> request = new HashMap<>();
@@ -93,7 +93,7 @@ public class AuthIntegrationTest {
         user.setPassword(passwordEncoder.encode("password123"));
         user.setFirstName("John");
         user.setLastName("Doe");
-        user.setActive(true);
+        user.setCreatedAt(LocalDateTime.now());
         userRepository.save(user);
 
         // Login to get refresh token
@@ -130,7 +130,7 @@ public class AuthIntegrationTest {
         user.setPassword(passwordEncoder.encode("password123"));
         user.setFirstName("John");
         user.setLastName("Doe");
-        user.setActive(true);
+        user.setCreatedAt(LocalDateTime.now());
         userRepository.save(user);
 
         // Login to get access token

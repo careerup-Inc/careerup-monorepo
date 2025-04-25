@@ -57,6 +57,14 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	tokens, err := h.authClient.Login(&req)
 	if err != nil {
+		// Check for specific status code in the error if it's a Fiber error
+		if fiberErr, ok := err.(*fiber.Error); ok {
+			return c.Status(fiberErr.Code).JSON(fiber.Map{
+				"error": fiberErr.Message,
+			})
+		}
+
+		// Default to 401 for other errors
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid credentials",
 		})

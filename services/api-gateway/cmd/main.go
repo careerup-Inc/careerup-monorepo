@@ -8,6 +8,7 @@ import (
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/docs"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/middleware"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -61,8 +62,14 @@ func main() {
 	// Initialize auth client
 	authClient := client.NewAuthClient("http://auth-core:8081")
 
+	// Initialize middlewares with auth client
+	authMiddleware := middleware.Auth(authClient)
+
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authClient)
+
+	// Use auth middleware for protected routes
+	app.Use("/api/protected/*", authMiddleware)
 
 	// Routes
 	api := app.Group("/api/v1")
