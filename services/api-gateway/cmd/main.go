@@ -60,16 +60,17 @@ func main() {
 	})
 
 	// Initialize auth client
-	authClient := client.NewAuthClient("http://auth-core:8081")
+	authClient := client.NewAuthClient("http://" + os.Getenv("AUTH_SERVICE_ADDR"))
 
 	// Initialize middlewares with auth client
-	authMiddleware := middleware.Auth(authClient)
+	authMiddleware := middleware.AuthMiddleware(authClient)
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authClient)
 
-	// Use auth middleware for protected routes
-	app.Use("/api/protected/*", authMiddleware)
+	// Protected routes
+	app.Use("/api/v1/user/*", authMiddleware)
+	app.Use("/api/v1/profile", authMiddleware)
 
 	// Routes
 	api := app.Group("/api/v1")

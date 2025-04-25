@@ -58,8 +58,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             filterChain.doFilter(request, response);
         } catch (io.jsonwebtoken.JwtException e) {
-            // Log the exception (optional)
-            // Let the request continue without authentication
+            // Any JWT exception should continue the chain without setting authentication
             filterChain.doFilter(request, response);
         }
     }

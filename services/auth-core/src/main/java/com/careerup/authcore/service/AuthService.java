@@ -87,19 +87,26 @@ public class AuthService {
     }
 
     public User validateToken(String token) {
-        String email = jwtService.extractUsername(token);
-        
-        // Verify token is valid
-        UserDetails userDetails = userRepository.findByEmail(email)
-            .map(user -> new UserDetailsImpl(user))
-            .orElseThrow(() -> new RuntimeException("User not found"));
+        try {
+            String email = jwtService.extractUsername(token);
+            if (email == null) {
+                throw new RuntimeException("Invalid token");
+            }
             
-        if (!jwtService.isTokenValid(token, userDetails)) {
-            throw new RuntimeException("Invalid token");
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Convert to UserDetails for validation
+            UserDetails userDetails = UserDetailsImpl.build(user);
+            
+            if (!jwtService.isTokenValid(token, userDetails)) {
+                throw new RuntimeException("Token is not valid");
+            }
+            
+            return user;
+        } catch (Exception e) {
+            throw new RuntimeException("Error validating token", e);
         }
-        
-        return userRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     public User getCurrentUser(String email) {
