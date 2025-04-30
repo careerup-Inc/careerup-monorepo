@@ -1,79 +1,23 @@
-package handler
+package handler_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-type MockAuthClient struct {
-	mock.Mock
-}
-
-func NewMockAuthClient() *MockAuthClient {
-	return &MockAuthClient{}
-}
-
-func (m *MockAuthClient) Register(ctx context.Context, req *client.RegisterRequest) (*client.User, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*client.User), args.Error(1)
-}
-
-func (m *MockAuthClient) Login(ctx context.Context, req *client.LoginRequest) (*client.TokenResponse, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*client.TokenResponse), args.Error(1)
-}
-
-func (m *MockAuthClient) RefreshToken(ctx context.Context, refreshToken string) (*client.TokenResponse, error) {
-	args := m.Called(ctx, refreshToken)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*client.TokenResponse), args.Error(1)
-}
-
-func (m *MockAuthClient) ValidateToken(ctx context.Context, token string) (*client.User, error) {
-	args := m.Called(ctx, token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*client.User), args.Error(1)
-}
-
-func (m *MockAuthClient) GetCurrentUser(ctx context.Context, token string) (*client.User, error) {
-	args := m.Called(ctx, token)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*client.User), args.Error(1)
-}
-
-func (m *MockAuthClient) UpdateUser(ctx context.Context, req *client.UpdateUserRequest) (*client.User, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*client.User), args.Error(1)
-}
-
 func TestAuthHandler_Register(t *testing.T) {
 	t.Run("successful registration", func(t *testing.T) {
-		mockClient := NewMockAuthClient()
-		handler := NewAuthHandler(mockClient)
+		mockClient := handler.NewMockAuthClient()
+		handler := handler.NewAuthHandler(mockClient)
 		app := fiber.New()
 		app.Post("/api/v1/auth/register", handler.Register)
 
@@ -110,8 +54,8 @@ func TestAuthHandler_Register(t *testing.T) {
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
-		mockClient := NewMockAuthClient()
-		handler := NewAuthHandler(mockClient)
+		mockClient := handler.NewMockAuthClient()
+		handler := handler.NewAuthHandler(mockClient)
 		app := fiber.New()
 		app.Post("/api/v1/auth/register", handler.Register)
 
@@ -133,8 +77,8 @@ func TestAuthHandler_Register(t *testing.T) {
 
 func TestAuthHandler_Login(t *testing.T) {
 	t.Run("successful login", func(t *testing.T) {
-		mockClient := NewMockAuthClient()
-		handler := NewAuthHandler(mockClient)
+		mockClient := handler.NewMockAuthClient()
+		handler := handler.NewAuthHandler(mockClient)
 		app := fiber.New()
 		app.Post("/api/v1/auth/login", handler.Login)
 
@@ -167,8 +111,8 @@ func TestAuthHandler_Login(t *testing.T) {
 	})
 
 	t.Run("invalid credentials", func(t *testing.T) {
-		mockClient := NewMockAuthClient()
-		handler := NewAuthHandler(mockClient)
+		mockClient := handler.NewMockAuthClient()
+		handler := handler.NewAuthHandler(mockClient)
 		app := fiber.New()
 		app.Post("/api/v1/auth/login", handler.Login)
 
@@ -191,8 +135,8 @@ func TestAuthHandler_Login(t *testing.T) {
 
 func TestAuthHandler_ValidateToken(t *testing.T) {
 	app := fiber.New()
-	mockClient := NewMockAuthClient()
-	handler := NewAuthHandler(mockClient)
+	mockClient := handler.NewMockAuthClient()
+	handler := handler.NewAuthHandler(mockClient)
 	app.Get("/api/v1/auth/validate", handler.ValidateToken)
 
 	t.Run("successful token validation", func(t *testing.T) {

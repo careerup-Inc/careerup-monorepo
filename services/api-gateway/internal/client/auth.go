@@ -123,7 +123,6 @@ func (c *AuthClient) Login(ctx context.Context, req *LoginRequest) (*TokenRespon
 }
 
 func (c *AuthClient) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
-
 	if refreshToken == "" {
 		return nil, fmt.Errorf("refresh token is required")
 	}
@@ -143,10 +142,6 @@ func (c *AuthClient) RefreshToken(ctx context.Context, refreshToken string) (*To
 }
 
 func (c *AuthClient) ValidateToken(ctx context.Context, token string) (*User, error) {
-	if token == "" {
-		return nil, fmt.Errorf("token is required")
-	}
-
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 

@@ -1,11 +1,14 @@
 package handler
 
 import (
-	"net/http"
+	"log"
+	"strings"
 
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
+	utils "github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/utils"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gorilla/websocket"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // @title CareerUP API
@@ -28,17 +31,9 @@ import (
 // @in header
 // @name Authorization
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // TODO: Configure allowed origins
-	},
-}
-
 type Handler struct {
-	authClient *client.AuthClient
-	chatClient *client.ChatClient
+	authClient client.AuthClientInterface
+	chatClient client.ChatClientInterface
 }
 
 func NewHandler(authClient *client.AuthClient, chatClient *client.ChatClient) *Handler {
@@ -46,30 +41,6 @@ func NewHandler(authClient *client.AuthClient, chatClient *client.ChatClient) *H
 		authClient: authClient,
 		chatClient: chatClient,
 	}
-}
-
-type RegisterRequest struct {
-	Email     string `json:"email" binding:"required,email" example:"user@example.com"`
-	Password  string `json:"password" binding:"required,min=8" example:"password123"`
-	FirstName string `json:"first_name" binding:"required" example:"John"`
-	LastName  string `json:"last_name" binding:"required" example:"Doe"`
-}
-
-type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email" example:"user@example.com"`
-	Password string `json:"password" binding:"required" example:"password123"`
-}
-
-type UpdateUserRequest struct {
-	Token     string   `json:"token" binding:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	FirstName string   `json:"first_name" example:"John"`
-	LastName  string   `json:"last_name" example:"Doe"`
-	Hometown  string   `json:"hometown" example:"New York"`
-	Interests []string `json:"interests" example:"['AI', 'Machine Learning']"`
-}
-
-type ValidateTokenRequest struct {
-	Token string `json:"token" binding:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 }
 
 // @Summary Register a new user
@@ -85,9 +56,7 @@ type ValidateTokenRequest struct {
 func (h *Handler) HandleRegister(c *fiber.Ctx) error {
 	var req RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid request body: "+err.Error())
 	}
 
 	// Call auth service to register user
@@ -99,9 +68,24 @@ func (h *Handler) HandleRegister(c *fiber.Ctx) error {
 	})
 
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		// Map gRPC errors
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid registration data: "+st.Message())
+			case codes.AlreadyExists:
+				return utils.SendErrorResponse(c, fiber.StatusConflict, "User already exists: "+st.Message())
+			case codes.Unavailable:
+				return utils.SendErrorResponse(c, fiber.StatusServiceUnavailable, "Auth service unavailable: "+st.Message())
+			default:
+				log.Printf("Unhandled gRPC error during registration: %v", err)
+				return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Registration failed: "+st.Message())
+			}
+		}
+		// Handle non-gRPC errors
+		log.Printf("Non-gRPC error during registration: %v", err)
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Registration failed: "+err.Error())
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(user)
@@ -120,9 +104,7 @@ func (h *Handler) HandleRegister(c *fiber.Ctx) error {
 func (h *Handler) HandleLogin(c *fiber.Ctx) error {
 	var req LoginRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return utils.SendErrorResponse(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	loginResp, err := h.authClient.Login(c.Context(), &client.LoginRequest{
@@ -130,12 +112,79 @@ func (h *Handler) HandleLogin(c *fiber.Ctx) error {
 		Password: req.Password,
 	})
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid credentials",
-		})
+		// Map gRPC errors
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid login data: "+st.Message())
+			case codes.Unauthenticated:
+				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid credentials: "+st.Message())
+			case codes.NotFound: // Assuming NotFound might mean user doesn't exist
+				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "User not found: "+st.Message())
+			case codes.Unavailable:
+				return utils.SendErrorResponse(c, fiber.StatusServiceUnavailable, "Auth service unavailable: "+st.Message())
+			default:
+				log.Printf("Unhandled gRPC error during login: %v", err)
+				return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Login failed: "+st.Message())
+			}
+		}
+		// Handle non-gRPC errors (like Fiber errors if client returns them)
+		if fiberErr, ok := err.(*fiber.Error); ok {
+			return utils.SendErrorResponse(c, fiberErr.Code, fiberErr.Message)
+		}
+		log.Printf("Non-gRPC error during login: %v", err)
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Login failed: "+err.Error())
 	}
 
 	return c.Status(fiber.StatusOK).JSON(loginResp)
+}
+
+// @Summary Refresh authentication token
+// @Description Provides new access and refresh tokens using a valid refresh token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Refresh Token Request"
+// @Success 200 {object} client.TokenResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/v1/auth/refresh [post]
+func (h *Handler) HandleRefreshToken(c *fiber.Ctx) error {
+	var req RefreshTokenRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid request body: "+err.Error())
+	}
+
+	if req.RefreshToken == "" {
+		return utils.SendErrorResponse(c, fiber.StatusBadRequest, "refresh_token is required")
+	}
+
+	tokens, err := h.authClient.RefreshToken(c.Context(), req.RefreshToken)
+	if err != nil {
+		// Map gRPC errors
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.Unauthenticated: // Treat invalid/expired refresh token as Unauthenticated
+				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid or expired refresh token: "+st.Message())
+			case codes.InvalidArgument:
+				return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid request format: "+st.Message())
+			case codes.Unavailable:
+				return utils.SendErrorResponse(c, fiber.StatusServiceUnavailable, "Auth service unavailable: "+st.Message())
+			default:
+				log.Printf("Unhandled gRPC error during refresh token: %v", err)
+				// Default to Unauthorized for safety with refresh tokens
+				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Token refresh failed: "+st.Message())
+			}
+		}
+		// Handle non-gRPC errors
+		log.Printf("Non-gRPC error during refresh token: %v", err)
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Token refresh failed: "+err.Error()) // Default to 401
+	}
+
+	// Return the new token response (contains new access_token, refresh_token, expires_in)
+	return c.Status(fiber.StatusOK).JSON(tokens)
 }
 
 // @Summary Get current user
@@ -148,20 +197,14 @@ func (h *Handler) HandleLogin(c *fiber.Ctx) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/profile [get]
 func (h *Handler) HandleGetProfile(c *fiber.Ctx) error {
-	token := c.Get("Authorization")
-	if token == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Authorization token required",
-		})
+	userLocal := c.Locals("user")
+	if userLocal == nil {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "User not found in context (middleware issue?)")
 	}
-
-	user, err := h.authClient.GetCurrentUser(c.Context(), token)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+	user, ok := userLocal.(*client.User)
+	if !ok || user == nil {
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Invalid user data in context")
 	}
-
 	return c.Status(fiber.StatusOK).JSON(user)
 }
 
@@ -178,68 +221,53 @@ func (h *Handler) HandleGetProfile(c *fiber.Ctx) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/profile [put]
 func (h *Handler) HandleUpdateProfile(c *fiber.Ctx) error {
-	token := c.Get("Authorization")
-	if token == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Authorization token required",
-		})
+	// Get user from context (set by auth middleware)
+	userLocal := c.Locals("user")
+	if userLocal == nil {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "User not found in context")
+	}
+	authUser, ok := userLocal.(*client.User)
+	if !ok || authUser == nil {
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Invalid user data in context")
 	}
 
 	var req UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid request body: "+err.Error())
 	}
 
-	user, err := h.authClient.UpdateUser(c.Context(), &client.UpdateUserRequest{
-		Token:     req.Token,
+	// Call auth service to update user
+	updatedUser, err := h.authClient.UpdateUser(c.Context(), &client.UpdateUserRequest{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Hometown:  req.Hometown,
 		Interests: req.Interests,
 	})
+
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		// Map gRPC errors
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid update data: "+st.Message())
+			case codes.NotFound: // User to update not found (shouldn't happen if token is valid)
+				return utils.SendErrorResponse(c, fiber.StatusNotFound, "User not found for update: "+st.Message())
+			case codes.Unauthenticated: // Should be caught by middleware, but handle defensively
+				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Authentication required: "+st.Message())
+			case codes.Unavailable:
+				return utils.SendErrorResponse(c, fiber.StatusServiceUnavailable, "Auth service unavailable: "+st.Message())
+			default:
+				log.Printf("Unhandled gRPC error during UpdateProfile: %v", err)
+				return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Failed to update profile: "+st.Message())
+			}
+		}
+		// Handle non-gRPC errors
+		log.Printf("Non-gRPC error during UpdateProfile: %v", err)
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Failed to update profile: "+err.Error())
 	}
 
-	return c.Status(fiber.StatusOK).JSON(user)
-}
-
-// @Summary WebSocket chat
-// @Description WebSocket endpoint for real-time chat
-// @Tags chat
-// @Security ApiKeyAuth
-// @Success 101 {string} string "Switching Protocols"
-// @Failure 401 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /api/v1/ws [get]
-func (h *Handler) HandleWebSocket(c *fiber.Ctx) error {
-	token := c.Get("Authorization")
-	if token == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Authorization token required",
-		})
-	}
-
-	// Validate token
-	_, err := h.authClient.ValidateToken(c.Context(), token)
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid token",
-		})
-	}
-
-	// Upgrade to WebSocket connection
-	if err := h.chatClient.UpgradeToWebSocket(c); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to upgrade to WebSocket",
-		})
-	}
-
-	return nil
+	return c.Status(fiber.StatusOK).JSON(updatedUser)
 }
 
 // @Summary Validate token
@@ -255,17 +283,82 @@ func (h *Handler) HandleWebSocket(c *fiber.Ctx) error {
 func (h *Handler) HandleValidateToken(c *fiber.Ctx) error {
 	var req ValidateTokenRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return utils.SendErrorResponse(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	user, err := h.authClient.ValidateToken(c.Context(), req.Token)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid token",
-		})
+		// Map gRPC errors
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.Unauthenticated: // Invalid/expired token
+				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid or expired token: "+st.Message())
+			case codes.InvalidArgument:
+				return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid token format: "+st.Message())
+			case codes.Unavailable:
+				return utils.SendErrorResponse(c, fiber.StatusServiceUnavailable, "Auth service unavailable: "+st.Message())
+			default:
+				log.Printf("Unhandled gRPC error during token validation: %v", err)
+				return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Token validation failed: "+st.Message())
+			}
+		}
+		// Handle non-gRPC errors
+		log.Printf("Non-gRPC error during token validation: %v", err)
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Token validation failed: "+err.Error())
 	}
 
 	return c.Status(fiber.StatusOK).JSON(user)
+}
+
+// @Summary WebSocket chat
+// @Description WebSocket endpoint for real-time chat
+// @Tags chat
+// @Security ApiKeyAuth
+// @Success 101 {string} string "Switching Protocols"
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/ws [get]
+func (h *Handler) HandleWebSocket(c *fiber.Ctx) error {
+	authHeader := c.Get("Authorization") // Get header directly
+	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Authorization header with Bearer token is required")
+	}
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// Validate token
+	user, err := h.authClient.ValidateToken(c.Context(), token)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.Unauthenticated:
+				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid or expired token for WebSocket: "+st.Message())
+			case codes.InvalidArgument:
+				return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid token format for WebSocket: "+st.Message())
+			case codes.Unavailable:
+				return utils.SendErrorResponse(c, fiber.StatusServiceUnavailable, "Auth service unavailable for WebSocket: "+st.Message())
+			default:
+				log.Printf("Unhandled gRPC error during WebSocket auth: %v", err)
+				return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "WebSocket authentication failed: "+st.Message())
+			}
+		}
+		log.Printf("Non-gRPC error during WebSocket auth: %v", err)
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "WebSocket authentication failed: "+err.Error())
+	}
+
+	// Upgrade to WebSocket connection
+	if err := h.chatClient.UpgradeToWebSocket(c, user); err != nil {
+		// UpgradeToWebSocket might return an error if the upgrade itself fails
+		// or if the initial connection to the backend chat service fails.
+		log.Printf("WebSocket upgrade/connection failed for user %s: %v", user.ID, err)
+		// Don't return JSON here if the upgrade failed, the connection might be hijacked.
+		// The error might have already been logged within UpgradeToWebSocket.
+		// Fiber's websocket.New handles sending the 101 internally on success.
+		// If UpgradeToWebSocket returns an error *before* the upgrade, we could send JSON.
+		// Let's assume UpgradeToWebSocket handles logging and potential initial error responses.
+		return err // Propagate the error if necessary
+	}
+
+	return nil
 }

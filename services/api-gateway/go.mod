@@ -1,6 +1,6 @@
 module github.com/careerup-Inc/careerup-monorepo/services/api-gateway
 
-go 1.23
+go 1.24.2
 
 require (
 	github.com/arsmn/fiber-swagger/v2 v2.31.1

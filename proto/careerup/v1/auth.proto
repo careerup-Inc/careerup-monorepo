@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package careerup.v1;
 
-option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1;careerupv1";
+option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/v1;v1";
 option java_package = "com.careerup.proto.v1";
 option java_multiple_files = true;
 

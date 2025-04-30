@@ -1,10 +1,8 @@
 package middleware
 
 import (
-	"context"
 	"time"
 
-	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/time/rate"
 )
@@ -33,41 +31,6 @@ func RateLimitInMemory() fiber.Handler {
 		if !limiter.Allow() {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error": "rate limit exceeded",
-			})
-		}
-		return c.Next()
-	}
-}
-
-// Auth middleware
-func Auth(authClient *client.AuthClient) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		// Create context with timeout for the gRPC call
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		token := c.Get("Authorization")
-		if token == "" {
-			return c.Next()
-		}
-
-		user, err := authClient.ValidateToken(ctx, token)
-		if err != nil {
-			return c.Next()
-		}
-
-		c.Locals("user_id", user.ID)
-		return c.Next()
-	}
-}
-
-// RequireAuth middleware
-func RequireAuth() fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		userID := c.Locals("user_id")
-		if userID == nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "authentication required",
 			})
 		}
 		return c.Next()

@@ -1,11 +1,22 @@
-FROM eclipse-temurin:21.0.6_7-jre-jammy
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
-
-COPY build/libs/*.jar app.jar
-
+    
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+    
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/server ./cmd/main.go
+    
+FROM alpine:latest
+    
+RUN apk --no-cache add ca-certificates
+    
+WORKDIR /root/
+    
+COPY --from=builder /app/server .
+    
+# Expose the default gRPC port the application listens on
 EXPOSE 8082
-
-USER nobody
-
-ENTRYPOINT ["java", "-jar", "app.jar"] 
+    
+CMD ["./server"]

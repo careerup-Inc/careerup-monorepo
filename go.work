@@ -1,7 +1,8 @@
-go 1.23.0
+go 1.24.2
 
 use (
-    ./proto
-    ./services/api-gateway
-    ./services/avatar-service
-) 
+	./proto
+	./services/api-gateway
+	./services/chat-gateway
+	./services/avatar-service
+)

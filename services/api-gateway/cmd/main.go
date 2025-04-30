@@ -7,12 +7,14 @@ import (
 	"github.com/arsmn/fiber-swagger/v2"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/docs"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/config"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/middleware"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 // @title CareerUP API
@@ -41,11 +43,31 @@ func main() {
 		log.Printf("Warning: .env file not found")
 	}
 
-	app := fiber.New()
+	cfg, err := config.LoadConfig("./configs/config.yaml")
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	app := fiber.New(fiber.Config{
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+		IdleTimeout:  cfg.Server.IdleTimeout,
+	})
 
 	// Middleware
 	app.Use(cors.New())
 	app.Use(logger.New())
+
+	// Initialize Redis for rate limiting
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: cfg.RateLimit.RedisAddr,
+	})
+	defer redisClient.Close()
+
+	// Add rate limiting if enabled
+	if cfg.RateLimit.Enabled {
+		app.Use(middleware.RateLimitMiddleware(redisClient, cfg.RateLimit.RequestsPerMinute))
+	}
 
 	// Swagger
 	app.Get("/swagger/*", swagger.New(swagger.Config{
@@ -56,25 +78,34 @@ func main() {
 
 	// Serve Swagger JSON
 	app.Get("/swagger/doc.json", func(c *fiber.Ctx) error {
+		// Ensure docs.SwaggerInfo is correctly generated and imported
+		docs.SwaggerInfo.Host = c.Hostname()
+		docs.SwaggerInfo.BasePath = "/api/v1"
 		return c.JSON(docs.SwaggerInfo)
 	})
 
-	// Initialize auth client
-	authClient, err := client.NewAuthClient("http://" + os.Getenv("AUTH_SERVICE_ADDR"))
-
+	// Initialize clients
+	authClient, err := client.NewAuthClient(cfg.Auth.ServiceAddr)
 	if err != nil {
 		log.Fatalf("Failed to create auth client: %v", err)
 	}
+	defer authClient.Close()
+
+	chatClient, err := client.NewChatClient(cfg.Chat.ServiceAddr)
+	if err != nil {
+		log.Fatalf("Failed to create chat client: %v", err)
+	}
+	defer chatClient.Close()
 
 	// Initialize middlewares with auth client
 	authMiddleware := middleware.AuthMiddleware(authClient)
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authClient)
+	mainHandler := handler.NewHandler(authClient, chatClient)
 
-	// Protected routes
-	app.Use("/api/v1/user/*", authMiddleware)
-	app.Use("/api/v1/profile", authMiddleware)
+	// Protected routes (Apply middleware before defining groups/routes)
+	protectedUser := app.Group("/api/v1/user", authMiddleware)       // Apply middleware to group
+	protectedProfile := app.Group("/api/v1/profile", authMiddleware) // Apply middleware to group
 
 	// Routes
 	api := app.Group("/api/v1")
@@ -89,11 +120,22 @@ func main() {
 		// Auth routes
 		auth := api.Group("/auth")
 		{
-			auth.Post("/register", authHandler.Register)
-			auth.Post("/login", authHandler.Login)
-			auth.Post("/refresh", authHandler.RefreshToken)
-			auth.Get("/validate", authHandler.ValidateToken)
+			auth.Post("/register", mainHandler.HandleRegister)
+			auth.Post("/login", mainHandler.HandleLogin)
+			auth.Post("/refresh", mainHandler.HandleRefreshToken)
+			auth.Get("/validate", mainHandler.HandleValidateToken)
 		}
+
+		// User routes (Protected via group middleware)
+		// These routes are already prefixed with /api/v1/user by the group
+		protectedUser.Get("/me", mainHandler.HandleGetProfile) // Assuming this exists on mainHandler
+
+		// Profile routes (Protected via group middleware)
+		// These routes are already prefixed with /api/v1/profile by the group
+		protectedProfile.Put("", mainHandler.HandleUpdateProfile) // Use PUT on the group base path
+
+		// Chat routes with WebSocket support (Unprotected initial upgrade, auth done inside handler)
+		api.Get("/ws", mainHandler.HandleWebSocket) // Use method from mainHandler
 	}
 
 	// Start server
