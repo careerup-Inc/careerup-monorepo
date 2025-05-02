@@ -135,7 +135,7 @@ func main() {
 		protectedProfile.Put("", mainHandler.HandleUpdateProfile) // Use PUT on the group base path
 
 		// Chat routes with WebSocket support (Unprotected initial upgrade, auth done inside handler)
-		api.Get("/ws", mainHandler.HandleWebSocket) // Use method from mainHandler
+		api.Get("/ws", mainHandler.HandleWebSocket)
 	}
 
 	// Start server

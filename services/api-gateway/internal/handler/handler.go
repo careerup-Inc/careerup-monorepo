@@ -1,14 +1,20 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
+	"io"
 	"log"
-	"strings"
 
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	utils "github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/utils"
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	pbChat "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
 )
 
 // @title CareerUP API
@@ -320,45 +326,164 @@ func (h *Handler) HandleValidateToken(c *fiber.Ctx) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/ws [get]
 func (h *Handler) HandleWebSocket(c *fiber.Ctx) error {
-	authHeader := c.Get("Authorization") // Get header directly
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Authorization header with Bearer token is required")
-	}
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-
-	// Validate token
-	user, err := h.authClient.ValidateToken(c.Context(), token)
-	if err != nil {
-		st, ok := status.FromError(err)
-		if ok {
-			switch st.Code() {
-			case codes.Unauthenticated:
-				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid or expired token for WebSocket: "+st.Message())
-			case codes.InvalidArgument:
-				return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid token format for WebSocket: "+st.Message())
-			case codes.Unavailable:
-				return utils.SendErrorResponse(c, fiber.StatusServiceUnavailable, "Auth service unavailable for WebSocket: "+st.Message())
-			default:
-				log.Printf("Unhandled gRPC error during WebSocket auth: %v", err)
-				return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "WebSocket authentication failed: "+st.Message())
-			}
+	// Check if it's a valid WebSocket upgrade request.
+	if websocket.IsWebSocketUpgrade(c) {
+		// Retrieve user ID set by the AuthMiddleware
+		userID, ok := c.Locals("userID").(string)
+		if !ok || userID == "" {
+			log.Println("WebSocket upgrade failed: User ID not found in context")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
 		}
-		log.Printf("Non-gRPC error during WebSocket auth: %v", err)
-		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "WebSocket authentication failed: "+err.Error())
+		log.Printf("WebSocket upgrade authorized for user: %s", userID)
+		c.Locals("allowed", true)
+		// Pass necessary info (like userID) to the WebSocket connection handler
+		c.Locals("userID", userID)
+		return c.Next() // Continue to the actual WebSocket connection handler
 	}
+	log.Println("WebSocket upgrade failed: Not a WebSocket upgrade request")
+	return fiber.ErrUpgradeRequired
+}
 
-	// Upgrade to WebSocket connection
-	if err := h.chatClient.UpgradeToWebSocket(c, user); err != nil {
-		// UpgradeToWebSocket might return an error if the upgrade itself fails
-		// or if the initial connection to the backend chat service fails.
-		log.Printf("WebSocket upgrade/connection failed for user %s: %v", user.ID, err)
-		// Don't return JSON here if the upgrade failed, the connection might be hijacked.
-		// The error might have already been logged within UpgradeToWebSocket.
-		// Fiber's websocket.New handles sending the 101 internally on success.
-		// If UpgradeToWebSocket returns an error *before* the upgrade, we could send JSON.
-		// Let's assume UpgradeToWebSocket handles logging and potential initial error responses.
-		return err // Propagate the error if necessary
+// WebSocketProxy handles the persistent WebSocket connection after upgrade.
+func (h *Handler) WebSocketProxy(conn *websocket.Conn) {
+	defer func() {
+		log.Println("Closing WebSocket connection")
+		conn.Close()
+	}()
+
+	// Retrieve user ID from locals set during the upgrade
+	userID := conn.Locals("userID").(string)
+	log.Printf("WebSocket connection established for user: %s", userID)
+
+	// --- gRPC Stream Setup ---
+	md := metadata.Pairs("user-id", userID)
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	// Add cancellation
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // Ensure cancellation happens on function exit
+
+	// Establish gRPC stream with chat-gateway
+	stream, err := h.chatClient.GetChatServiceClient().Stream(ctx)
+	if err != nil {
+		log.Printf("Failed to establish gRPC stream with chat-gateway: %v", err)
+		_ = conn.WriteJSON(ServerMessage{Type: "error", ErrorMessage: "Failed to connect to chat service"})
+		return
 	}
+	log.Println("gRPC stream established with chat-gateway")
 
-	return nil
+	// Goroutine to read from gRPC stream and write to WebSocket
+	go func() {
+		defer log.Println("Exiting gRPC read goroutine")
+		for {
+			res, err := stream.Recv()
+			if err != nil {
+				// Handle different kinds of errors
+				st, ok := status.FromError(err)
+				if ok {
+					if st.Code() == codes.Canceled {
+						log.Println("gRPC stream context cancelled (likely client disconnect)")
+					} else {
+						log.Printf("gRPC stream receive error: %v, code: %s", err, st.Code())
+						// Send error to WebSocket client if connection is still likely open
+						_ = conn.WriteJSON(ServerMessage{Type: "error", ErrorMessage: "Chat service connection error"})
+					}
+				} else if err == io.EOF {
+					log.Println("gRPC stream closed by chat-gateway (EOF)")
+				} else {
+					log.Printf("gRPC stream receive error (non-gRPC): %v", err)
+					_ = conn.WriteJSON(ServerMessage{Type: "error", ErrorMessage: "Chat service communication error"})
+				}
+				cancel() // Cancel context to potentially stop the write loop below
+				return   // Exit goroutine
+			}
+
+			// Construct message based on gRPC response type
+			var msg ServerMessage
+			switch res.Type {
+			case "assistant_token":
+				if tokenContent := res.GetToken(); tokenContent != "" {
+					msg = ServerMessage{Type: "assistant_token", Token: tokenContent}
+				} else {
+					log.Println("Received assistant_token with empty content")
+					continue
+				}
+			case "avatar_url":
+				if urlContent := res.GetUrl(); urlContent != "" {
+					msg = ServerMessage{Type: "avatar_url", URL: urlContent}
+				} else {
+					log.Println("Received avatar_url with empty content")
+					continue
+				}
+			case "error":
+				if errorContent := res.GetErrorMessage(); errorContent != "" {
+					msg = ServerMessage{Type: "error", ErrorMessage: errorContent}
+				} else {
+					log.Println("Received error with empty content")
+					continue
+				}
+			default:
+				log.Printf("Unknown message type from gRPC: %s", res.Type)
+				continue // Skip unknown types
+			}
+
+			// Write the message to the WebSocket client
+			if err := conn.WriteJSON(msg); err != nil {
+				log.Printf("WebSocket write error: %v", err)
+				// Assume client disconnected, cancel context to close gRPC stream
+				cancel()
+				return // Exit goroutine
+			}
+			// log.Printf("Sent message to WebSocket: Type=%s", msg.Type) // Can be noisy
+		}
+	}()
+
+	// --- WebSocket Read Loop ---
+	log.Println("Starting WebSocket read loop")
+	for {
+		messageType, msgBytes, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket read error (unexpected close): %v", err)
+			} else {
+				log.Printf("WebSocket read error: %v", err)
+			}
+			cancel() // Close gRPC stream
+			break    // Exit read loop
+		}
+
+		if messageType == websocket.TextMessage {
+			// log.Printf("Received message from WebSocket: %s", string(msgBytes))
+			var clientMsg ClientMessage
+			if err := json.Unmarshal(msgBytes, &clientMsg); err != nil {
+				log.Printf("Failed to unmarshal client message: %v", err)
+				_ = conn.WriteJSON(ServerMessage{Type: "error", ErrorMessage: "Invalid message format"})
+				continue
+			}
+
+			// Basic validation
+			if clientMsg.Type != "user_msg" || clientMsg.Text == "" {
+				log.Printf("Invalid client message type or empty text: Type=%s", clientMsg.Type)
+				_ = conn.WriteJSON(ServerMessage{Type: "error", ErrorMessage: "Invalid message type or empty text"})
+				continue
+			}
+
+			// Send to gRPC stream
+			grpcReq := &pbChat.StreamRequest{
+				Type:           clientMsg.Type,
+				ConversationId: clientMsg.ConversationID,
+				Text:           clientMsg.Text,
+			}
+			if err := stream.Send(grpcReq); err != nil {
+				log.Printf("gRPC stream send error: %v", err)
+				// Assume gRPC stream is broken, send error and close connection
+				_ = conn.WriteJSON(ServerMessage{Type: "error", ErrorMessage: "Failed to send message to chat service"})
+				cancel()
+				break // Exit read loop
+			}
+			// log.Printf("Sent message to gRPC: Type=%s", grpcReq.Type)
+		} else {
+			log.Printf("Received non-text message type: %d", messageType)
+		}
+	}
+	log.Println("Exiting WebSocket read loop")
 }

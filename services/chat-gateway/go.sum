@@ -1,5 +1,5 @@
-github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250425185809-41e8fabe7bec h1:RO5woRX/daYNdmkilv0xzuB16xKa3hrtvV6Uz9VPytw=
-github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250425185809-41e8fabe7bec/go.mod h1:+zf/ICwHueyweoq02VcGAUbJigTgFB/PfLrJeH+79y8=
+github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250502162705-c3d84fcef2d3 h1:neLxa2TslAZQ2BPcom34UdrhrcwdMux7mr9xON10low=
+github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250502162705-c3d84fcef2d3/go.mod h1:+zf/ICwHueyweoq02VcGAUbJigTgFB/PfLrJeH+79y8=
 github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
 github.com/go-logr/logr v1.4.2/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=

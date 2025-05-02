@@ -3,7 +3,7 @@ module github.com/careerup-Inc/careerup-monorepo/services/chat-gateway
 go 1.24.2
 
 require (
-	github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250425185809-41e8fabe7bec
+	github.com/careerup-Inc/careerup-monorepo/proto v0.0.0-20250502162705-c3d84fcef2d3
 	google.golang.org/grpc v1.72.0
 )
 

@@ -1,84 +1,52 @@
 package client
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
+	"log"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure" // Use insecure for local development
+
+	pbllm "github.com/careerup-Inc/careerup-monorepo/proto/llm/v1" // Corrected import path
 )
 
-// LLMGatewayClient handles communication with the llm-gateway service.
-type LLMGatewayClient struct {
-	httpClient *http.Client
-	baseURL    string
+// LLMClient wraps the gRPC client for the LLM service.
+type LLMClient struct {
+	grpcClient pbllm.LLMServiceClient
+	conn       *grpc.ClientConn // Keep a reference to close it later
 }
 
-// CompletionRequest defines the structure sent to the llm-gateway.
-// Adjust this based on what llm-gateway will expect.
-type CompletionRequest struct {
-	ConversationID string `json:"conversation_id"`
-	Prompt         string `json:"prompt"`
-	// Add other fields like user_id, model preference, etc. if needed
-}
-
-// CompletionResponse defines the structure received from the llm-gateway.
-// Adjust this based on what llm-gateway will return.
-// For MVP, let's assume it returns the full completion text.
-// Later, this might need to support streaming.
-type CompletionResponse struct {
-	Completion string `json:"completion"`
-	// Add other fields like model used, token counts, etc.
-}
-
-// NewLLMGatewayClient creates a new client instance.
-func NewLLMGatewayClient(baseURL string) *LLMGatewayClient {
-	return &LLMGatewayClient{
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second, // Set a reasonable timeout
-		},
-		baseURL: baseURL,
-	}
-}
-
-// GetCompletion sends a prompt to the llm-gateway and gets a completion.
-// This is a blocking call for MVP. Streaming would require a different approach.
-func (c *LLMGatewayClient) GetCompletion(ctx context.Context, convID, prompt string) (*CompletionResponse, error) {
-	requestURL := fmt.Sprintf("%s/api/v1/completion", c.baseURL) // Example endpoint
-
-	reqBody := CompletionRequest{
-		ConversationID: convID,
-		Prompt:         prompt,
-	}
-
-	jsonData, err := json.Marshal(reqBody)
+// NewLLMClient creates a new gRPC client for the LLM service.
+func NewLLMClient(llmServiceAddr string) (*LLMClient, error) {
+	log.Printf("Attempting to connect to LLM gRPC service at %s", llmServiceAddr)
+	// Establish gRPC connection (use insecure credentials for local dev)
+	// Add options for retry, timeout, etc. in production
+	conn, err := grpc.Dial(
+		llmServiceAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),                 // Block until connection is up or fails
+		grpc.WithTimeout(10*time.Second), // Connection timeout
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		log.Printf("Failed to connect to LLM service at %s: %v", llmServiceAddr, err)
+		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	// Add any other required headers (e.g., internal auth token if needed)
+	client := pbllm.NewLLMServiceClient(conn)
+	log.Printf("Connected to LLM gRPC service at %s", llmServiceAddr)
+	return &LLMClient{grpcClient: client, conn: conn}, nil
+}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request to llm-gateway: %w", err)
-	}
-	defer resp.Body.Close()
+// GetLLMServiceClient returns the raw gRPC client interface.
+func (c *LLMClient) GetLLMServiceClient() pbllm.LLMServiceClient {
+	return c.grpcClient
+}
 
-	if resp.StatusCode != http.StatusOK {
-		// TODO: Read error body for more details if available
-		return nil, fmt.Errorf("llm-gateway returned non-OK status: %s", resp.Status)
+// Close closes the underlying gRPC connection.
+func (c *LLMClient) Close() error {
+	log.Println("Closing connection to LLM gRPC service...")
+	if c.conn != nil {
+		return c.conn.Close()
 	}
-
-	var completionResp CompletionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&completionResp); err != nil {
-		return nil, fmt.Errorf("failed to decode llm-gateway response: %w", err)
-	}
-
-	return &completionResp, nil
+	return nil
 }

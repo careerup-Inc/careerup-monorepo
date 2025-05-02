@@ -27,3 +27,18 @@ type ValidateTokenRequest struct {
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" example:"your_refresh_token_here"`
 }
+
+// ClientMessage defines the structure for messages received from the WebSocket client
+type ClientMessage struct {
+	Type           string `json:"type"` // e.g., "user_msg"
+	ConversationID string `json:"conversation_id"`
+	Text           string `json:"text"`
+}
+
+// ServerMessage defines the structure for messages sent to the WebSocket client
+type ServerMessage struct {
+	Type         string `json:"type"`            // e.g., "assistant_token", "avatar_url", "error"
+	Token        string `json:"token,omitempty"` // For type="assistant_token"
+	URL          string `json:"url,omitempty"`   // For type="avatar_url"
+	ErrorMessage string `json:"error,omitempty"` // For type="error"
+}
