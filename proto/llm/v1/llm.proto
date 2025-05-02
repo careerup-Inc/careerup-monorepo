@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package llm.v1;
+
+// Define appropriate options based on your project structure
+option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/llm/v1;llmv1";
+
+service LLMService {
+  // GenerateStream streams responses from the LLM.
+  rpc GenerateStream(GenerateStreamRequest) returns (stream GenerateStreamResponse);
+}
+
+message GenerateStreamRequest {
+  string prompt = 1;
+  string user_id = 2; // Optional: for context/personalization
+  string conversation_id = 3; // Optional: for context/history
+}
+
+message GenerateStreamResponse {
+  string token = 1; // A single token chunk
+  // Optionally add error information if needed at the token level
+  // string error = 2;
+}

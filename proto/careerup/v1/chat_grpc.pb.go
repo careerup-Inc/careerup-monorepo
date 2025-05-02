@@ -26,6 +26,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConversationServiceClient interface {
+	// Stream establishes a bidirectional stream for chat messages.
 	Stream(ctx context.Context, opts ...grpc.CallOption) (ConversationService_StreamClient, error)
 }
 
@@ -72,6 +73,7 @@ func (x *conversationServiceStreamClient) Recv() (*StreamResponse, error) {
 // All implementations must embed UnimplementedConversationServiceServer
 // for forward compatibility
 type ConversationServiceServer interface {
+	// Stream establishes a bidirectional stream for chat messages.
 	Stream(ConversationService_StreamServer) error
 	mustEmbedUnimplementedConversationServiceServer()
 }

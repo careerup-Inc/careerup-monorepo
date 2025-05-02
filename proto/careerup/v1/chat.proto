@@ -6,23 +6,31 @@ option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/v1;v1";
 option java_package = "com.careerup.proto.v1";
 option java_multiple_files = true;
 
-// StreamRequest represents a single token in the conversation stream
+// StreamRequest represents a message sent from the client (api-gateway)
+// to the chat service over the gRPC stream.
 message StreamRequest {
-  string conversation_id = 1;
-  string text = 2;
+  string type = 1; // e.g., "user_msg"
+  string conversation_id = 2;
+  string text = 3; // Content for "user_msg"
 }
 
-// StreamResponse represents a response from the LLM
+// StreamResponse represents a message sent from the chat service
+// back to the client (api-gateway) over the gRPC stream.
 message StreamResponse {
-  oneof response {
-    string token = 1;
-    string avatar_url = 2;
+  string type = 1; // e.g., "assistant_token", "avatar_url", "error"
+
+  // Content depends on the type.
+  oneof content {
+    string token = 2;         // For type="assistant_token"
+    string url = 3;           // For type="avatar_url"
+    string error_message = 4; // For type="error"
   }
 }
 
-// ConversationService handles the chat stream
+// ConversationService handles the chat stream between api-gateway and chat-gateway
 service ConversationService {
-  rpc Stream(stream StreamRequest) returns (stream StreamResponse) {}
+  // Stream establishes a bidirectional stream for chat messages.
+  rpc Stream(stream StreamRequest) returns (stream StreamResponse);
 }
 
 // WebSocketMessage represents the JSON structure for WebSocket communication
@@ -46,4 +54,4 @@ message AssistantToken {
 
 message AvatarUrl {
   string url = 1;
-} 
+}
