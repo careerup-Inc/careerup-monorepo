@@ -28,6 +28,60 @@ services:
       timeout: 5s
       retries: 5
 
+  auth-core:
+    build:
+      context: ./services/auth-core
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081" # Expose the port auth-core listens on
+    depends_on:
+      postgres:
+        condition: service_healthy # Wait for postgres to be ready
+    environment:
+      # Pass necessary environment variables for Spring Boot app
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-careerup}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-careerup}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-careerup}
+      JWT_SECRET: ${JWT_SECRET} # Pass JWT secret
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-core # Depends on auth service
+      - chat-gateway # Depends on chat service
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  chat-gateway:
+    build:
+      context: ./services/chat-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    depends_on:
+      - llm-gateway
+    env_file:
+      - .env # Load LLM_SERVICE_ADDR
+    restart: unless-stopped
+
+  llm-gateway:
+    build:
+      context: ./services/llm-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "9090:9090"
+    env_file:
+      - .env # Load OPENAI_API_KEY, etc.
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data: 
