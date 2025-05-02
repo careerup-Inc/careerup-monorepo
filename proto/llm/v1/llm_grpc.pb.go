@@ -27,7 +27,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LLMServiceClient interface {
 	// GenerateStream streams responses from the LLM.
-	GenerateStream(ctx context.Context, in *GenerateRequest, opts ...grpc.CallOption) (LLMService_GenerateStreamClient, error)
+	GenerateStream(ctx context.Context, in *GenerateStreamRequest, opts ...grpc.CallOption) (LLMService_GenerateStreamClient, error)
 }
 
 type lLMServiceClient struct {
@@ -38,7 +38,7 @@ func NewLLMServiceClient(cc grpc.ClientConnInterface) LLMServiceClient {
 	return &lLMServiceClient{cc}
 }
 
-func (c *lLMServiceClient) GenerateStream(ctx context.Context, in *GenerateRequest, opts ...grpc.CallOption) (LLMService_GenerateStreamClient, error) {
+func (c *lLMServiceClient) GenerateStream(ctx context.Context, in *GenerateStreamRequest, opts ...grpc.CallOption) (LLMService_GenerateStreamClient, error) {
 	stream, err := c.cc.NewStream(ctx, &LLMService_ServiceDesc.Streams[0], LLMService_GenerateStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (c *lLMServiceClient) GenerateStream(ctx context.Context, in *GenerateReque
 }
 
 type LLMService_GenerateStreamClient interface {
-	Recv() (*GenerateResponse, error)
+	Recv() (*GenerateStreamResponse, error)
 	grpc.ClientStream
 }
 
@@ -62,8 +62,8 @@ type lLMServiceGenerateStreamClient struct {
 	grpc.ClientStream
 }
 
-func (x *lLMServiceGenerateStreamClient) Recv() (*GenerateResponse, error) {
-	m := new(GenerateResponse)
+func (x *lLMServiceGenerateStreamClient) Recv() (*GenerateStreamResponse, error) {
+	m := new(GenerateStreamResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (x *lLMServiceGenerateStreamClient) Recv() (*GenerateResponse, error) {
 // for forward compatibility
 type LLMServiceServer interface {
 	// GenerateStream streams responses from the LLM.
-	GenerateStream(*GenerateRequest, LLMService_GenerateStreamServer) error
+	GenerateStream(*GenerateStreamRequest, LLMService_GenerateStreamServer) error
 	mustEmbedUnimplementedLLMServiceServer()
 }
 
@@ -83,7 +83,7 @@ type LLMServiceServer interface {
 type UnimplementedLLMServiceServer struct {
 }
 
-func (UnimplementedLLMServiceServer) GenerateStream(*GenerateRequest, LLMService_GenerateStreamServer) error {
+func (UnimplementedLLMServiceServer) GenerateStream(*GenerateStreamRequest, LLMService_GenerateStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method GenerateStream not implemented")
 }
 func (UnimplementedLLMServiceServer) mustEmbedUnimplementedLLMServiceServer() {}
@@ -100,7 +100,7 @@ func RegisterLLMServiceServer(s grpc.ServiceRegistrar, srv LLMServiceServer) {
 }
 
 func _LLMService_GenerateStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GenerateRequest)
+	m := new(GenerateStreamRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func _LLMService_GenerateStream_Handler(srv interface{}, stream grpc.ServerStrea
 }
 
 type LLMService_GenerateStreamServer interface {
-	Send(*GenerateResponse) error
+	Send(*GenerateStreamResponse) error
 	grpc.ServerStream
 }
 
@@ -116,7 +116,7 @@ type lLMServiceGenerateStreamServer struct {
 	grpc.ServerStream
 }
 
-func (x *lLMServiceGenerateStreamServer) Send(m *GenerateResponse) error {
+func (x *lLMServiceGenerateStreamServer) Send(m *GenerateStreamResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
