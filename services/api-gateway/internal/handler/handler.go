@@ -33,9 +33,10 @@ import (
 // @BasePath /
 // @schemes http
 
-// @securityDefinitions.apikey ApiKeyAuth
-// @in header
-// @name Authorization
+// @securityDefinitions.BearerAuth
+// @type http
+// @scheme bearer
+// @bearerFormat JWT
 
 type Handler struct {
 	authClient client.AuthClientInterface
@@ -197,11 +198,11 @@ func (h *Handler) HandleRefreshToken(c *fiber.Ctx) error {
 // @Description Get the current authenticated user's profile
 // @Tags user
 // @Produce json
-// @Security ApiKeyAuth
+// @Security BearerAuth
 // @Success 200 {object} User
 // @Failure 401 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /api/v1/profile [get]
+// @Router /api/v1/user/me [get]
 func (h *Handler) HandleGetProfile(c *fiber.Ctx) error {
 	userLocal := c.Locals("user")
 	if userLocal == nil {
@@ -219,7 +220,7 @@ func (h *Handler) HandleGetProfile(c *fiber.Ctx) error {
 // @Tags user
 // @Accept json
 // @Produce json
-// @Security ApiKeyAuth
+// @Security BearerAuth
 // @Param request body UpdateUserRequest true "Update Request"
 // @Success 200 {object} User
 // @Failure 400 {object} ErrorResponse
@@ -237,6 +238,15 @@ func (h *Handler) HandleUpdateProfile(c *fiber.Ctx) error {
 		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Invalid user data in context")
 	}
 
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Authorization header is required")
+	}
+	token := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token = authHeader[7:]
+	}
+
 	var req UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
 		return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid request body: "+err.Error())
@@ -244,6 +254,7 @@ func (h *Handler) HandleUpdateProfile(c *fiber.Ctx) error {
 
 	// Call auth service to update user
 	updatedUser, err := h.authClient.UpdateUser(c.Context(), &client.UpdateUserRequest{
+		Token:     token,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Hometown:  req.Hometown,
@@ -281,24 +292,29 @@ func (h *Handler) HandleUpdateProfile(c *fiber.Ctx) error {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body ValidateTokenRequest true "Token to validate"
+// @Param Authorization header string true "Bearer token"
 // @Success 200 {object} User
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
-// @Router /api/v1/auth/validate [post]
+// @Router /api/v1/auth/validate [get]
 func (h *Handler) HandleValidateToken(c *fiber.Ctx) error {
-	var req ValidateTokenRequest
-	if err := c.BodyParser(&req); err != nil {
-		return utils.SendErrorResponse(c, fiber.StatusBadRequest, err.Error())
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Authorization header is required")
 	}
 
-	user, err := h.authClient.ValidateToken(c.Context(), req.Token)
+	token := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token = authHeader[7:]
+	}
+
+	user, err := h.authClient.ValidateToken(c.Context(), token)
 	if err != nil {
 		// Map gRPC errors
 		st, ok := status.FromError(err)
 		if ok {
 			switch st.Code() {
-			case codes.Unauthenticated: // Invalid/expired token
+			case codes.Unauthenticated:
 				return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid or expired token: "+st.Message())
 			case codes.InvalidArgument:
 				return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid token format: "+st.Message())
@@ -320,7 +336,7 @@ func (h *Handler) HandleValidateToken(c *fiber.Ctx) error {
 // @Summary WebSocket chat
 // @Description WebSocket endpoint for real-time chat
 // @Tags chat
-// @Security ApiKeyAuth
+// @Security BearerAuth
 // @Success 101 {string} string "Switching Protocols"
 // @Failure 401 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse

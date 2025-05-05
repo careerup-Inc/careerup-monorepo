@@ -36,3 +36,6 @@ swagger:
   description: Authentication service for CareerUP
   version: 1.0.0
   base-package: com.careerup.auth 
+
+grpc:
+  enabled: true

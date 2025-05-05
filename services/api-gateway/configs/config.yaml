@@ -5,10 +5,10 @@ server:
   idle_timeout: 120s
 
 auth:
-  service_addr: "auth-core:8081"
-  jwt_secret: "your-jwt-secret-key"
+  service_addr: "auth-core:9091"
+  jwt_secret: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
   access_token_ttl: 15m
-  refresh_token_ttl: 7d
+  refresh_token_ttl: 168h
 
 chat:
   service_addr: "chat-gateway:8082"

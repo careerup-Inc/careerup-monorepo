@@ -163,7 +163,7 @@ const docTemplate = `{
             }
         },
         "/api/v1/auth/validate": {
-            "post": {
+            "get": {
                 "description": "Validate an authentication token",
                 "consumes": [
                     "application/json"
@@ -177,13 +177,11 @@ const docTemplate = `{
                 "summary": "Validate token",
                 "parameters": [
                     {
-                        "description": "Token to validate",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.ValidateTokenRequest"
-                        }
+                        "type": "string",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -212,7 +210,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "ApiKeyAuth": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "Get the current authenticated user's profile",
@@ -247,7 +245,7 @@ const docTemplate = `{
             "put": {
                 "security": [
                     {
-                        "ApiKeyAuth": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "Update the current authenticated user's profile",
@@ -304,7 +302,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "ApiKeyAuth": []
+                        "BearerAuth": []
                     }
                 ],
                 "description": "WebSocket endpoint for real-time chat",
@@ -497,25 +495,6 @@ const docTemplate = `{
                     "example": "Doe"
                 }
             }
-        },
-        "handler.ValidateTokenRequest": {
-            "type": "object",
-            "required": [
-                "token"
-            ],
-            "properties": {
-                "token": {
-                    "type": "string",
-                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                }
-            }
-        }
-    },
-    "securityDefinitions": {
-        "ApiKeyAuth": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
         }
     }
 }`

@@ -4,6 +4,17 @@ import com.careerup.authcore.model.User;
 import com.careerup.authcore.model.dto.TokenResponse;
 import com.careerup.authcore.repository.UserRepository;
 import com.careerup.authcore.security.UserDetailsImpl;
+import com.careerup.proto.v1.LoginRequest;
+import com.careerup.proto.v1.LoginResponse;
+import com.careerup.proto.v1.RegisterRequest;
+import com.careerup.proto.v1.RegisterResponse;
+import com.careerup.proto.v1.ValidateTokenRequest;
+import com.careerup.proto.v1.ValidateTokenResponse;
+import com.careerup.proto.v1.RefreshTokenRequest;
+import com.careerup.proto.v1.RefreshTokenResponse;
+import com.careerup.proto.v1.UpdateUserRequest;
+import com.careerup.proto.v1.UpdateUserResponse;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -126,4 +137,83 @@ public class AuthService {
 
         return userRepository.save(user);
     }
-} 
+
+    // grpc methods
+    public LoginResponse grpcLogin(LoginRequest request) {
+        String email = request.getEmail();
+        String password = request.getPassword();
+        TokenResponse tokenResponse = login(email, password);
+        
+        return LoginResponse.newBuilder()
+            .setAccessToken(tokenResponse.accessToken())
+            .setRefreshToken(tokenResponse.refreshToken())
+            .setExpireIn(tokenResponse.expiresIn())
+            .build();
+    }
+
+    public RegisterResponse grpcRegister(RegisterRequest request) {
+        User user = register(request.getEmail(), request.getPassword(), request.getFirstName(), request.getLastName());
+
+        com.careerup.proto.v1.User protoUser = com.careerup.proto.v1.User.newBuilder()
+        .setId(user.getId() != null ? user.getId().toString() : "")
+        .setEmail(user.getEmail())
+        .setFirstName(user.getFirstName() != null ? user.getFirstName() : "")
+        .setLastName(user.getLastName() != null ? user.getLastName() : "")
+        .setHometown(user.getHometown() != null ? user.getHometown() : "")
+        .build();
+        
+        return RegisterResponse.newBuilder()
+            .setUser(protoUser)
+            .build();
+    }
+
+    public ValidateTokenResponse grpcValidateToken(ValidateTokenRequest request) {
+        String token = request.getToken();
+        User user = validateToken(token);
+        
+        com.careerup.proto.v1.User protoUser = com.careerup.proto.v1.User.newBuilder()
+            .setId(user.getId() != null ? user.getId().toString() : "")
+            .setEmail(user.getEmail())
+            .setFirstName(user.getFirstName() != null ? user.getFirstName() : "")
+            .setLastName(user.getLastName() != null ? user.getLastName() : "")
+            .setHometown(user.getHometown() != null ? user.getHometown() : "")
+            .build();
+        
+        return ValidateTokenResponse.newBuilder()
+            .setUser(protoUser)
+            .build();
+    }
+
+    public RefreshTokenResponse grpcRefreshToken(RefreshTokenRequest request) {
+        String refreshToken = request.getRefreshToken();
+        TokenResponse tokenResponse = refreshToken(refreshToken);
+        
+        return RefreshTokenResponse.newBuilder()
+            .setAccessToken(tokenResponse.accessToken())
+            .setRefreshToken(tokenResponse.refreshToken())
+            .setExpireIn(tokenResponse.expiresIn())
+            .build();
+    }
+
+    public UpdateUserResponse grpcUpdateUser(UpdateUserRequest request) {
+        String token = request.getToken();
+        // find user to be update by token
+        User _user = validateToken(token);
+        String firstName = request.getFirstName();
+        String lastName = request.getLastName();
+        String hometown = request.getHometown();
+        List<String> interests = request.getInterestsList();
+
+        User user = updateUser(_user.getEmail(), firstName, lastName, hometown, interests);
+
+        com.careerup.proto.v1.User protoUser = com.careerup.proto.v1.User.newBuilder()
+            .setFirstName(user.getFirstName() != null ? user.getFirstName() : "")
+            .setLastName(user.getLastName() != null ? user.getLastName() : "")
+            .setHometown(user.getHometown() != null ? user.getHometown() : "")
+            .build();
+
+        return UpdateUserResponse.newBuilder()
+            .setUser(protoUser)
+            .build();
+    }
+}

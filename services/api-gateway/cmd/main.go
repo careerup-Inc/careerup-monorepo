@@ -2,10 +2,9 @@ package main
 
 import (
 	"log"
-	"os"
+	"strconv"
 
-	"github.com/arsmn/fiber-swagger/v2"
-	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/docs"
+	_ "github.com/careerup-Inc/careerup-monorepo/services/api-gateway/docs"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/config"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
@@ -13,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/swagger"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 )
@@ -33,11 +33,14 @@ import (
 // @BasePath /
 // @schemes http
 
-// @securityDefinitions.apikey ApiKeyAuth
-// @in header
-// @name Authorization
+// @securityDefinitions.BearerAuth
+// @type http
+// @scheme bearer
+// @bearerFormat JWT
 
 func main() {
+	log.Println("Starting API Gateway...")
+
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Warning: .env file not found")
@@ -70,19 +73,10 @@ func main() {
 	}
 
 	// Swagger
-	app.Get("/swagger/*", swagger.New(swagger.Config{
-		URL:         "/swagger/doc.json",
-		DeepLinking: true,
-		Title:       "CareerUP API",
-	}))
+	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	// Serve Swagger JSON
-	app.Get("/swagger/doc.json", func(c *fiber.Ctx) error {
-		// Ensure docs.SwaggerInfo is correctly generated and imported
-		docs.SwaggerInfo.Host = c.Hostname()
-		docs.SwaggerInfo.BasePath = "/api/v1"
-		return c.JSON(docs.SwaggerInfo)
-	})
+	app.Static("/swagger/doc.json", "./docs/swagger.json")
 
 	// Initialize clients
 	authClient, err := client.NewAuthClient(cfg.Auth.ServiceAddr)
@@ -128,7 +122,7 @@ func main() {
 
 		// User routes (Protected via group middleware)
 		// These routes are already prefixed with /api/v1/user by the group
-		protectedUser.Get("/me", mainHandler.HandleGetProfile) // Assuming this exists on mainHandler
+		protectedUser.Get("/me", mainHandler.HandleGetProfile)
 
 		// Profile routes (Protected via group middleware)
 		// These routes are already prefixed with /api/v1/profile by the group
@@ -139,13 +133,13 @@ func main() {
 	}
 
 	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	port := cfg.Server.Port
+	if port == 0 {
+		port = 8080 // Default port
 	}
 
-	log.Printf("Server starting on port %s", port)
-	if err := app.Listen(":" + port); err != nil {
+	log.Printf("Server starting on port %d", port)
+	if err := app.Listen(":" + strconv.Itoa(port)); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

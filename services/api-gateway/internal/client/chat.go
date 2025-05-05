@@ -2,8 +2,7 @@ package client
 
 import (
 	"fmt"
-	// Added for logging
-	// Import the correct v1 proto package
+
 	chatpb "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -23,9 +22,11 @@ type ChatClient struct {
 
 // NewChatClient needs to initialize the ConversationServiceClient
 func NewChatClient(addr string) (*ChatClient, error) {
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to chat service at %s: %w", addr, err)
+	} else {
+		fmt.Printf("Connected to chat service at %s\n", addr)
 	}
 	client := chatpb.NewConversationServiceClient(conn)
 	return &ChatClient{

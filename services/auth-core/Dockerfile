@@ -4,7 +4,10 @@ WORKDIR /app
 
 COPY build/libs/*.jar app.jar
 
+# HTTP
 EXPOSE 8081
+# gRPC
+EXPOSE 9091
 
 USER nobody
 

@@ -1,70 +1,54 @@
 package handler
 
 import (
-	"io"
-	"net/http"
-
+	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	"github.com/gofiber/fiber/v2"
 )
 
-type UpdateProfileRequest struct {
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Interests string `json:"interests"`
-	Hometown  string `json:"hometown"`
-}
-
-func GetProfile(c *fiber.Ctx) error {
-	// Get user from context
-	user := c.Locals("user")
-	if user == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "User not authenticated",
-		})
-	}
-
-	// Forward request to auth service
-	resp, err := http.Get("http://auth-core:8081/api/v1/users/me")
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get profile",
-		})
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to read response",
-		})
-	}
-
-	return c.Status(resp.StatusCode).Send(body)
-}
-
 func UpdateProfile(c *fiber.Ctx) error {
-	var req UpdateProfileRequest
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Authorization header is required",
+		})
+	}
+	token := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token = authHeader[7:]
+	}
+
+	var req client.UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
+	// Set token from header
+	req.Token = token
 
-	// Forward request to auth service
-	resp, err := http.Post("http://auth-core:8081/api/v1/users/me", "application/json", nil)
-	if err != nil {
+	// Use gRPC client from context or global (update as needed)
+	handlerIface := c.Locals("handler")
+	var authClient client.AuthClientInterface
+	if handlerIface != nil {
+		h, ok := handlerIface.(interface {
+			GetAuthClient() client.AuthClientInterface
+		})
+		if ok {
+			authClient = h.GetAuthClient()
+		}
+	}
+	if authClient == nil {
+		// fallback: get from global or return error
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update profile",
+			"error": "Auth client not available",
 		})
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	updatedUser, err := authClient.UpdateUser(c.Context(), &req)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to read response",
+			"error": "Failed to update profile: " + err.Error(),
 		})
 	}
-
-	return c.Status(resp.StatusCode).Send(body)
+	return c.Status(fiber.StatusOK).JSON(updatedUser)
 }

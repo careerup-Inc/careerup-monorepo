@@ -16,7 +16,7 @@ type AuthClientInterface interface {
 	Login(ctx context.Context, req *LoginRequest) (*TokenResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error)
 	ValidateToken(ctx context.Context, token string) (*User, error)
-	GetCurrentUser(ctx context.Context, token string) (*User, error)
+	// GetCurrentUser(ctx context.Context, token string) (*User, error) // Don't need this for the implement as we already have the user in the context so no need to implement this
 	UpdateUser(ctx context.Context, req *UpdateUserRequest) (*User, error)
 }
 
@@ -26,15 +26,11 @@ type AuthClient struct {
 }
 
 func NewAuthClient(addr string) (*AuthClient, error) {
-	// Set up connection with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock())
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect to auth service: %v", err)
+		log.Fatalf("Failed to connect to auth service: %s %v", addr, err)
+	} else {
+		log.Printf("Connected to auth service at %s", addr)
 	}
 
 	return &AuthClient{
@@ -76,7 +72,7 @@ type User struct {
 }
 
 type UpdateUserRequest struct {
-	Token     string   `json:"token"`
+	Token     string   `json:"-"`
 	FirstName string   `json:"firstName"`
 	LastName  string   `json:"lastName"`
 	Hometown  string   `json:"hometown"`
@@ -155,28 +151,9 @@ func (c *AuthClient) ValidateToken(ctx context.Context, token string) (*User, er
 	return convertProtoUser(resp.User), nil
 }
 
-func (c *AuthClient) GetCurrentUser(ctx context.Context, token string) (*User, error) {
-	if token == "" {
-		return nil, fmt.Errorf("token is required")
-	}
-
-	resp, err := c.client.GetCurrentUser(ctx, &pb.GetCurrentUserRequest{
-		Token: token,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return convertProtoUser(resp.User), nil
-}
-
 func (c *AuthClient) UpdateUser(ctx context.Context, req *UpdateUserRequest) (*User, error) {
 	if req.FirstName == "" && req.LastName == "" && req.Hometown == "" && len(req.Interests) == 0 {
 		return nil, fmt.Errorf("at least one field is required to update")
-	}
-
-	if req.Token == "" {
-		return nil, fmt.Errorf("token is required")
 	}
 
 	resp, err := c.client.UpdateUser(ctx, &pb.UpdateUserRequest{

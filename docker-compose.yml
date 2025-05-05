@@ -34,6 +34,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8081:8081" # Expose the port auth-core listens on
+      - "9091:9091"
     depends_on:
       postgres:
         condition: service_healthy # Wait for postgres to be ready

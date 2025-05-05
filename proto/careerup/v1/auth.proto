@@ -67,16 +67,6 @@ message RefreshTokenResponse {
   int64 expire_in = 4;
 }
 
-// AuthService handles user authentication
-service AuthService {
-  rpc Register(RegisterRequest) returns (RegisterResponse) {}
-  rpc Login(LoginRequest) returns (LoginResponse) {}
-  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {}
-  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {}
-  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse) {}
-  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
-}
-
 message GetCurrentUserRequest {
   string token = 1;
 }
@@ -97,4 +87,14 @@ message UpdateUserRequest {
 // UpdateUserResponse contains the updated user
 message UpdateUserResponse {
   User user = 1;
+}
+
+// AuthService handles user authentication
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse) {}
+  rpc Login(LoginRequest) returns (LoginResponse) {}
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {}
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {}
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse) {}
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
 }

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"os"
 	"strings"
 	"time"
 
@@ -13,20 +12,6 @@ import (
 
 // Cache for validated tokens to reduce calls to auth-core
 var tokenCache = cache.New(5*time.Minute, 10*time.Minute)
-var authClientInstance *client.AuthClient
-
-// Initialize the auth client
-func init() {
-	authServiceAddr := os.Getenv("AUTH_SERVICE_ADDR")
-	if authServiceAddr == "" {
-		authServiceAddr = "auth-core:8081" // Default value
-	}
-	client, err := client.NewAuthClient("http://" + authServiceAddr)
-	if err != nil {
-		panic("Failed to create auth client: " + err.Error())
-	}
-	authClientInstance = client
-}
 
 func AuthMiddleware(authClient *client.AuthClient) fiber.Handler {
 	return func(c *fiber.Ctx) error {

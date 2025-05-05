@@ -6,14 +6,13 @@ import (
 	"log"
 	"time"
 
-	// Use the correct proto import path based on buf.gen.yaml output
 	pbChat "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
 	pbllm "github.com/careerup-Inc/careerup-monorepo/proto/llm/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/careerup-Inc/careerup-monorepo/services/chat-gateway/internal/client" // Adjust import path
+	"github.com/careerup-Inc/careerup-monorepo/services/chat-gateway/internal/client"
 )
 
 // ChatServer implements the ConversationService gRPC interface.

@@ -2,12 +2,11 @@ package client
 
 import (
 	"log"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure" // Use insecure for local development
 
-	pbllm "github.com/careerup-Inc/careerup-monorepo/proto/llm/v1" // Corrected import path
+	pbllm "github.com/careerup-Inc/careerup-monorepo/proto/llm/v1"
 )
 
 // LLMClient wraps the gRPC client for the LLM service.
@@ -21,11 +20,9 @@ func NewLLMClient(llmServiceAddr string) (*LLMClient, error) {
 	log.Printf("Attempting to connect to LLM gRPC service at %s", llmServiceAddr)
 	// Establish gRPC connection (use insecure credentials for local dev)
 	// Add options for retry, timeout, etc. in production
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		llmServiceAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),                 // Block until connection is up or fails
-		grpc.WithTimeout(10*time.Second), // Connection timeout
 	)
 	if err != nil {
 		log.Printf("Failed to connect to LLM service at %s: %v", llmServiceAddr, err)
