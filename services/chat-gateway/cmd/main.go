@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	// Use the correct proto import path
 	pbChat "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
 	"github.com/careerup-Inc/careerup-monorepo/services/chat-gateway/internal/client"
 	"github.com/careerup-Inc/careerup-monorepo/services/chat-gateway/internal/server"
@@ -21,13 +20,13 @@ func main() {
 	// Configuration (consider using a config file/library like Viper or envconfig)
 	grpcPort := os.Getenv("GRPC_PORT")
 	if grpcPort == "" {
-		grpcPort = "50052" // Default gRPC port for chat-gateway
+		grpcPort = "8082" // Default gRPC port for chat-gateway
 	}
 	grpcAddr := fmt.Sprintf(":%s", grpcPort)
 
 	llmServiceAddr := os.Getenv("LLM_SERVICE_ADDR")
 	if llmServiceAddr == "" {
-		llmServiceAddr = "llm-gateway:50053" // Default address for llm-gateway (service name in Docker)
+		llmServiceAddr = "llm-gateway:9090" // Default address for llm-gateway (service name in Docker)
 	}
 
 	log.Printf("Starting Chat Gateway gRPC server on %s", grpcAddr)
