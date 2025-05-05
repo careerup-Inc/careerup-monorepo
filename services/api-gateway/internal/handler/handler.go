@@ -342,21 +342,22 @@ func (h *Handler) HandleValidateToken(c *fiber.Ctx) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/ws [get]
 func (h *Handler) HandleWebSocket(c *fiber.Ctx) error {
-	// Check if it's a valid WebSocket upgrade request.
 	if websocket.IsWebSocketUpgrade(c) {
-		// Retrieve user ID set by the AuthMiddleware
-		userID, ok := c.Locals("userID").(string)
-		if !ok || userID == "" {
-			log.Println("WebSocket upgrade failed: User ID not found in context")
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+		authHeader := c.Get("Authorization")
+		if authHeader == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authorization header is required"})
 		}
-		log.Printf("WebSocket upgrade authorized for user: %s", userID)
-		c.Locals("allowed", true)
-		// Pass necessary info (like userID) to the WebSocket connection handler
-		c.Locals("userID", userID)
-		return c.Next() // Continue to the actual WebSocket connection handler
+		token := authHeader
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			token = authHeader[7:]
+		}
+		user, err := h.authClient.ValidateToken(c.Context(), token)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token"})
+		}
+		c.Locals("userID", user.ID)
+		return c.Next()
 	}
-	log.Println("WebSocket upgrade failed: Not a WebSocket upgrade request")
 	return fiber.ErrUpgradeRequired
 }
 

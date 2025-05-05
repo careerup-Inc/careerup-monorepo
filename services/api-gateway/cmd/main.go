@@ -9,6 +9,7 @@ import (
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/config"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/handler"
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/middleware"
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -130,6 +131,7 @@ func main() {
 
 		// Chat routes with WebSocket support (Unprotected initial upgrade, auth done inside handler)
 		api.Get("/ws", mainHandler.HandleWebSocket)
+		api.Get("/ws", websocket.New(mainHandler.WebSocketProxy))
 	}
 
 	// Start server
