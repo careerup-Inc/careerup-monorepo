@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package careerup.v1;
+
+option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/v1;v1";
+option java_package = "com.careerup.proto.v1";
+option java_multiple_files = true;
+
+// IloDomain represents one of the 5 domains assessed in the ILO test
+message IloDomain {
+  string code = 1;           // LANG, LOGIC, DESIGN, PEOPLE, MECH
+  string name = 2;           // Ngôn ngữ, Phân tích - lôgic, etc.
+  string description = 3;    // Optional description
+}
+
+// IloLevel represents the evaluation level for a domain score
+message IloLevel {
+  int32 min_percent = 1;
+  int32 max_percent = 2;
+  string level_name = 3;     // Rất mạnh, Mạnh, Trung bình, Yếu
+  string suggestion = 4;     // Suggestion text for this level
+}
+
+// IloCareerSuggestion represents a career suggestion for a domain
+message IloCareerSuggestion {
+  string domain_code = 1;    // Associated domain code
+  string career_field = 2;   // Career field name
+}
+
+// IloDomainScore represents a scored domain for a user
+message IloDomainScore {
+  string domain_code = 1;    // LANG, LOGIC, etc.
+  int32 raw_score = 2;       // Raw score (sum of question scores)
+  float percent = 3;         // Percentage score (raw/48*100)
+  string level = 4;          // Evaluation level
+  int32 rank = 5;            // Ranking (1-5)
+}
+
+// IloTestResult represents a user's complete ILO test result
+message IloTestResult {
+  string id = 1;
+  string user_id = 2;
+  string result_data = 3;              // Raw JSON data for backward compatibility
+  string created_at = 4;
+  repeated IloDomainScore scores = 5;  // Structured scores by domain
+  repeated string top_domains = 6;     // Top domain codes
+  repeated string suggested_careers = 7; // List of suggested career fields
+}
+
+// IloAnswer represents a single answer to an ILO test question
+message IloAnswer {
+  string question_id = 1;
+  int32 question_number = 2;
+  int32 selected_option = 3;  // 1-4 representing the score
+}
+
+// Request to submit an ILO test result
+message SubmitIloTestResultRequest {
+  string user_id = 1;
+  repeated IloAnswer answers = 2;
+  string raw_result_data = 3;  // Optional raw data for backward compatibility
+}
+
+// Response after submitting an ILO test result
+message SubmitIloTestResultResponse {
+  IloTestResult result = 1;
+}
+
+// Request to get all ILO test results for a user
+message GetIloTestResultsRequest {
+  string user_id = 1;
+}
+
+// Response with a list of ILO test results
+message GetIloTestResultsResponse {
+  repeated IloTestResult results = 1;
+}
+
+// Request to get the ILO test (questions/structure)
+message GetIloTestRequest {}
+
+// ILO test question structure
+message IloTestQuestion {
+  string id = 1;
+  int32 question_number = 2;
+  string text = 3;
+  string domain_code = 4;    // Associated domain code
+  repeated string options = 5;
+}
+
+// ILO test structure (list of questions and domains)
+message GetIloTestResponse {
+  repeated IloTestQuestion questions = 1;
+  repeated IloDomain domains = 2;
+  repeated IloLevel levels = 3;
+}
+
+// Request to get available career suggestions
+message GetIloCareerSuggestionsRequest {
+  repeated string domain_codes = 1;  // Domain codes to get suggestions for
+  int32 limit = 2;              // Maximum number of suggestions
+}
+
+// Response with career suggestions
+message GetIloCareerSuggestionsResponse {
+  repeated IloCareerSuggestion suggestions = 1;
+}
+
+// Service for ILO test operations
+service IloService {
+  // Submit a completed ILO test
+  rpc SubmitIloTestResult(SubmitIloTestResultRequest) returns (SubmitIloTestResultResponse);
+  
+  // Get all ILO test results for a user
+  rpc GetIloTestResults(GetIloTestResultsRequest) returns (GetIloTestResultsResponse);
+  
+  // Get ILO test questions and structure
+  rpc GetIloTest(GetIloTestRequest) returns (GetIloTestResponse);
+  
+  // Get career suggestions based on domain scores
+  rpc GetIloCareerSuggestions(GetIloCareerSuggestionsRequest) returns (GetIloCareerSuggestionsResponse);
+}
