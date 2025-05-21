@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	IloService_SubmitIloTestResult_FullMethodName     = "/careerup.v1.IloService/SubmitIloTestResult"
 	IloService_GetIloTestResults_FullMethodName       = "/careerup.v1.IloService/GetIloTestResults"
+	IloService_GetIloTestResult_FullMethodName        = "/careerup.v1.IloService/GetIloTestResult"
 	IloService_GetIloTest_FullMethodName              = "/careerup.v1.IloService/GetIloTest"
 	IloService_GetIloCareerSuggestions_FullMethodName = "/careerup.v1.IloService/GetIloCareerSuggestions"
 )
@@ -33,6 +34,8 @@ type IloServiceClient interface {
 	SubmitIloTestResult(ctx context.Context, in *SubmitIloTestResultRequest, opts ...grpc.CallOption) (*SubmitIloTestResultResponse, error)
 	// Get all ILO test results for a user
 	GetIloTestResults(ctx context.Context, in *GetIloTestResultsRequest, opts ...grpc.CallOption) (*GetIloTestResultsResponse, error)
+	// Get a specific ILO test result by ID
+	GetIloTestResult(ctx context.Context, in *GetIloTestResultRequest, opts ...grpc.CallOption) (*GetIloTestResultResponse, error)
 	// Get ILO test questions and structure
 	GetIloTest(ctx context.Context, in *GetIloTestRequest, opts ...grpc.CallOption) (*GetIloTestResponse, error)
 	// Get career suggestions based on domain scores
@@ -65,6 +68,15 @@ func (c *iloServiceClient) GetIloTestResults(ctx context.Context, in *GetIloTest
 	return out, nil
 }
 
+func (c *iloServiceClient) GetIloTestResult(ctx context.Context, in *GetIloTestResultRequest, opts ...grpc.CallOption) (*GetIloTestResultResponse, error) {
+	out := new(GetIloTestResultResponse)
+	err := c.cc.Invoke(ctx, IloService_GetIloTestResult_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *iloServiceClient) GetIloTest(ctx context.Context, in *GetIloTestRequest, opts ...grpc.CallOption) (*GetIloTestResponse, error) {
 	out := new(GetIloTestResponse)
 	err := c.cc.Invoke(ctx, IloService_GetIloTest_FullMethodName, in, out, opts...)
@@ -91,6 +103,8 @@ type IloServiceServer interface {
 	SubmitIloTestResult(context.Context, *SubmitIloTestResultRequest) (*SubmitIloTestResultResponse, error)
 	// Get all ILO test results for a user
 	GetIloTestResults(context.Context, *GetIloTestResultsRequest) (*GetIloTestResultsResponse, error)
+	// Get a specific ILO test result by ID
+	GetIloTestResult(context.Context, *GetIloTestResultRequest) (*GetIloTestResultResponse, error)
 	// Get ILO test questions and structure
 	GetIloTest(context.Context, *GetIloTestRequest) (*GetIloTestResponse, error)
 	// Get career suggestions based on domain scores
@@ -107,6 +121,9 @@ func (UnimplementedIloServiceServer) SubmitIloTestResult(context.Context, *Submi
 }
 func (UnimplementedIloServiceServer) GetIloTestResults(context.Context, *GetIloTestResultsRequest) (*GetIloTestResultsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetIloTestResults not implemented")
+}
+func (UnimplementedIloServiceServer) GetIloTestResult(context.Context, *GetIloTestResultRequest) (*GetIloTestResultResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetIloTestResult not implemented")
 }
 func (UnimplementedIloServiceServer) GetIloTest(context.Context, *GetIloTestRequest) (*GetIloTestResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetIloTest not implemented")
@@ -163,6 +180,24 @@ func _IloService_GetIloTestResults_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IloService_GetIloTestResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetIloTestResultRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IloServiceServer).GetIloTestResult(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IloService_GetIloTestResult_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IloServiceServer).GetIloTestResult(ctx, req.(*GetIloTestResultRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _IloService_GetIloTest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetIloTestRequest)
 	if err := dec(in); err != nil {
@@ -213,6 +248,10 @@ var IloService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetIloTestResults",
 			Handler:    _IloService_GetIloTestResults_Handler,
+		},
+		{
+			MethodName: "GetIloTestResult",
+			Handler:    _IloService_GetIloTestResult_Handler,
 		},
 		{
 			MethodName: "GetIloTest",

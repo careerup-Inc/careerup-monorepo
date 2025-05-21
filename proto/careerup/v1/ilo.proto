@@ -76,6 +76,16 @@ message GetIloTestResultsResponse {
   repeated IloTestResult results = 1;
 }
 
+// Request to get a specific ILO test result by ID
+message GetIloTestResultRequest {
+  string result_id = 1;
+}
+
+// Response with a specific ILO test result
+message GetIloTestResultResponse {
+  IloTestResult result = 1;
+}
+
 // Request to get the ILO test (questions/structure)
 message GetIloTestRequest {}
 
@@ -113,6 +123,9 @@ service IloService {
   
   // Get all ILO test results for a user
   rpc GetIloTestResults(GetIloTestResultsRequest) returns (GetIloTestResultsResponse);
+
+  // Get a specific ILO test result by ID
+  rpc GetIloTestResult(GetIloTestResultRequest) returns (GetIloTestResultResponse);
   
   // Get ILO test questions and structure
   rpc GetIloTest(GetIloTestRequest) returns (GetIloTestResponse);
