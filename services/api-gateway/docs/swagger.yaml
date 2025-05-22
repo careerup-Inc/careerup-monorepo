@@ -1,5 +1,18 @@
 basePath: /
 definitions:
+  client.IloDomainScore:
+    properties:
+      domain_code:
+        type: string
+      level:
+        type: string
+      percent:
+        type: number
+      rank:
+        type: integer
+      raw_score:
+        type: integer
+    type: object
   client.TokenResponse:
     properties:
       access_token:
@@ -13,6 +26,98 @@ definitions:
     properties:
       error:
         example: error message
+        type: string
+    type: object
+  handler.GetIloTestResponse:
+    properties:
+      domains:
+        items:
+          $ref: '#/definitions/handler.IloDomain'
+        type: array
+      levels:
+        items:
+          $ref: '#/definitions/handler.IloLevel'
+        type: array
+      questions:
+        items:
+          $ref: '#/definitions/handler.IloTestQuestion'
+        type: array
+    type: object
+  handler.IloAnswer:
+    properties:
+      question_id:
+        type: string
+      question_number:
+        type: integer
+      selected_option:
+        type: integer
+    type: object
+  handler.IloDomain:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+    type: object
+  handler.IloLevel:
+    properties:
+      level_name:
+        type: string
+      max_percent:
+        type: integer
+      min_percent:
+        type: integer
+      suggestion:
+        type: string
+    type: object
+  handler.IloTestQuestion:
+    properties:
+      domain_code:
+        type: string
+      id:
+        type: string
+      options:
+        items:
+          type: string
+        type: array
+      question_number:
+        type: integer
+      text:
+        type: string
+    type: object
+  handler.IloTestResultRequest:
+    properties:
+      answers:
+        items:
+          $ref: '#/definitions/handler.IloAnswer'
+        type: array
+      result_data:
+        example: '{"score":85,"details":{...}}'
+        type: string
+    type: object
+  handler.IloTestResultResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      result_data:
+        type: string
+      scores:
+        items:
+          $ref: '#/definitions/client.IloDomainScore'
+        type: array
+      suggested_careers:
+        items:
+          type: string
+        type: array
+      top_domains:
+        items:
+          type: string
+        type: array
+      user_id:
         type: string
     type: object
   handler.LoginRequest:
@@ -83,6 +188,11 @@ definitions:
       last_name:
         example: Doe
         type: string
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+    required:
+    - token
     type: object
   handler.User:
     properties:
@@ -242,16 +352,83 @@ paths:
       summary: Validate token
       tags:
       - auth
-  /api/v1/profile:
+  /api/v1/ilo/result:
+    post:
+      consumes:
+      - application/json
+      description: Submit ILO test result for the authenticated user and get analysis
+      parameters:
+      - description: ILO Test Result Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.IloTestResultRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.IloTestResultResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Submit ILO test result
+      tags:
+      - ilo
+  /api/v1/ilo/result/{id}:
     get:
-      description: Get the current authenticated user's profile
+      description: Get a specific ILO test result by ID for the authenticated user
+      parameters:
+      - description: Result ID
+        in: path
+        name: id
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.User'
+            $ref: '#/definitions/handler.IloTestResultResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get a specific ILO test result by ID
+      tags:
+      - ilo
+  /api/v1/ilo/results:
+    get:
+      description: Get all ILO test results for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.IloTestResultResponse'
+            type: array
         "401":
           description: Unauthorized
           schema:
@@ -260,11 +437,27 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get current user
+      summary: Get all ILO test results for a user
       tags:
-      - user
+      - ilo
+  /api/v1/ilo/test:
+    get:
+      description: Get all questions for the ILO test
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetIloTestResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Get ILO test questions
+      tags:
+      - ilo
+  /api/v1/profile:
     put:
       consumes:
       - application/json
@@ -298,6 +491,29 @@ paths:
       security:
       - BearerAuth: []
       summary: Update current user
+      tags:
+      - user
+  /api/v1/user/me:
+    get:
+      description: Get the current authenticated user's profile
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user
       tags:
       - user
   /api/v1/ws:

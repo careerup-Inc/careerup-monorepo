@@ -10,6 +10,8 @@ type Config struct {
 	Server    ServerConfig    `mapstructure:"server"`
 	Auth      AuthConfig      `mapstructure:"auth"`
 	Chat      ChatConfig      `mapstructure:"chat"`
+	Ilo       IloConfig       `mapstructure:"ilo"`
+	LLM       LLMConfig       `mapstructure:"llm"`
 	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
 	Tracing   TracingConfig   `mapstructure:"tracing"`
 }
@@ -29,6 +31,14 @@ type AuthConfig struct {
 }
 
 type ChatConfig struct {
+	ServiceAddr string `mapstructure:"service_addr"`
+}
+
+type IloConfig struct {
+	ServiceAddr string `mapstructure:"service_addr"`
+}
+
+type LLMConfig struct {
 	ServiceAddr string `mapstructure:"service_addr"`
 }
 

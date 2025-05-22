@@ -1,6 +1,7 @@
 package com.careerup.authcore;
 
 import com.careerup.authcore.service.AuthGrpcService;
+import com.careerup.authcore.service.IloGrpcService;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,9 @@ public class GrpcServerRunner implements CommandLineRunner {
     private AuthGrpcService authGrpcService;
 
     @Autowired
+    private IloGrpcService iloGrpcService;
+
+    @Autowired
     private Environment environment;
 
     @Value("${grpc.enabled:true}")
@@ -30,6 +34,7 @@ public class GrpcServerRunner implements CommandLineRunner {
             int grpcPort = 9091;
             server = ServerBuilder.forPort(grpcPort)
             .addService(authGrpcService)
+            .addService(iloGrpcService)
             .build()
             .start();
             System.out.println("gRPC server started on port " + grpcPort);

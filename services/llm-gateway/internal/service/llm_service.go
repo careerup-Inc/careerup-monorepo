@@ -2,15 +2,14 @@ package service
 
 import (
 	"context"
-	"fmt" // Ensure fmt is imported for error formatting
+	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/llms/openai" // Correct path for NewChat
+	"github.com/tmc/langchaingo/llms/openai"
 
-	// Correct path for schema types
 	pbllm "github.com/careerup-Inc/careerup-monorepo/proto/llm/v1"
 )
 

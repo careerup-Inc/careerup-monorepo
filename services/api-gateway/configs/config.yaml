@@ -13,6 +13,12 @@ auth:
 chat:
   service_addr: "chat-gateway:8082"
 
+ilo:
+  service_addr: "auth-core:9091"
+
+llm:
+  service_addr: "llm-gateway:50053"
+
 rate_limit:
   enabled: true
   requests_per_minute: 100
@@ -22,4 +28,4 @@ tracing:
   enabled: true
   service_name: "api-gateway"
   endpoint: "tempo:4317"
-  insecure: true 
+  insecure: true

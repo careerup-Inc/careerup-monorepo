@@ -3,8 +3,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/client"
 	utils "github.com/careerup-Inc/careerup-monorepo/services/api-gateway/internal/utils"
@@ -41,12 +43,20 @@ import (
 type Handler struct {
 	authClient client.AuthClientInterface
 	chatClient client.ChatClientInterface
+	// ILO gRPC client
+	IloClient *client.IloClient
+	LLMClient *client.LLMClient
+	// Auth core service address for REST calls
+	authCoreServiceAddr string
 }
 
-func NewHandler(authClient *client.AuthClient, chatClient *client.ChatClient) *Handler {
+func NewHandler(authClient *client.AuthClient, chatClient *client.ChatClient, iloClient *client.IloClient, llmClient *client.LLMClient, authCoreAddr string) *Handler {
 	return &Handler{
-		authClient: authClient,
-		chatClient: chatClient,
+		authClient:          authClient,
+		chatClient:          chatClient,
+		IloClient:           iloClient,
+		LLMClient:           llmClient,
+		authCoreServiceAddr: authCoreAddr,
 	}
 }
 
@@ -503,4 +513,207 @@ func (h *Handler) WebSocketProxy(conn *websocket.Conn) {
 		}
 	}
 	log.Println("Exiting WebSocket read loop")
+}
+
+// @Summary Submit ILO test result
+// @Description Submit ILO test result for the authenticated user and get analysis
+// @Tags ilo
+// @Accept json
+// @Produce json
+// @Param request body IloTestResultRequest true "ILO Test Result Request"
+// @Success 201 {object} IloTestResultResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/v1/ilo/result [post]
+func (h *Handler) HandleIloTestResult(c *fiber.Ctx) error {
+	var req IloTestResultRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Invalid request body: "+err.Error())
+	}
+
+	token := utils.ExtractTokenFromHeader(c)
+	if token == "" {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Missing or invalid Authorization header")
+	}
+
+	// Save ILO result via gRPC to ILO service
+	user, err := h.authClient.ValidateToken(c.Context(), token)
+	if err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid token: "+err.Error())
+	}
+
+	// Parse answers from request if they exist
+	var answers []client.IloAnswer
+	if len(req.Answers) > 0 {
+		answers = make([]client.IloAnswer, len(req.Answers))
+		for i, ans := range req.Answers {
+			answers[i] = client.IloAnswer{
+				QuestionID:     ans.QuestionID,
+				QuestionNumber: ans.QuestionNumber,
+				SelectedOption: ans.SelectedOption,
+			}
+		}
+	}
+
+	result, err := h.IloClient.SubmitILOTestResult(c.Context(), &client.SubmitILOTestResultRequest{
+		UserID:        user.ID,
+		Answers:       answers,
+		RawResultData: req.ResultData,
+	})
+	if err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Failed to save ILO test result: "+err.Error())
+	}
+
+	// Create a rich prompt for LLM analysis with structured data
+	llmPrompt := "Analyze this ILO test result with the following domain scores:\n"
+	for _, score := range result.Scores {
+		llmPrompt += fmt.Sprintf("- %s: %.1f%% (%s)\n", score.DomainCode, score.Percent, score.Level)
+	}
+
+	if len(result.TopDomains) > 0 {
+		llmPrompt += "\nTop domains: " + strings.Join(result.TopDomains, ", ")
+	}
+
+	llmPrompt += "\nRaw data: " + req.ResultData
+
+	llmAnalysis, err := h.LLMClient.AnalyzeILOResult(c.Context(), &client.LLMAnalysisRequest{
+		Prompt: llmPrompt,
+		UserID: user.ID,
+	})
+	if err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Failed to analyze ILO test result: "+err.Error())
+	}
+
+	resp := IloTestResultResponse{
+		ID:               result.ID,
+		UserID:           result.UserID,
+		ResultData:       result.ResultData,
+		CreatedAt:        result.CreatedAt,
+		Scores:           result.Scores,
+		TopDomains:       result.TopDomains,
+		SuggestedCareers: result.SuggestedCareers,
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"result":    resp,
+		"analysis":  llmAnalysis,
+		"copyright": "Thang đo ILO © ILO Vietnam 2020 – sử dụng cho mục đích hướng nghiệp, trích dẫn có ghi nguồn.",
+	})
+}
+
+// @Summary Get ILO test questions
+// @Description Get all questions for the ILO test
+// @Tags ilo
+// @Produce json
+// @Success 200 {object} GetIloTestResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/ilo/test [get]
+func (h *Handler) HandleGetIloTest(c *fiber.Ctx) error {
+	// Call the client to get ILO test questions
+	test, err := h.IloClient.GetIloTest(c.Context())
+	if err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Failed to get ILO test: "+err.Error())
+	}
+
+	// Add copyright information
+	response := fiber.Map{
+		"questions": test.Questions,
+		"domains":   test.Domains,
+		"levels":    test.Levels,
+		"copyright": "Thang đo ILO © ILO Vietnam 2020 – sử dụng cho mục đích hướng nghiệp, trích dẫn có ghi nguồn.",
+	}
+
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+
+// @Summary Get all ILO test results for a user
+// @Description Get all ILO test results for the authenticated user
+// @Tags ilo
+// @Produce json
+// @Success 200 {array} IloTestResultResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/ilo/results [get]
+func (h *Handler) HandleGetIloResults(c *fiber.Ctx) error {
+	token := utils.ExtractTokenFromHeader(c)
+	if token == "" {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Missing or invalid Authorization header")
+	}
+
+	// Validate token and get user ID
+	user, err := h.authClient.ValidateToken(c.Context(), token)
+	if err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid token: "+err.Error())
+	}
+
+	// Get all results for this user
+	results, err := h.IloClient.GetIloTestResults(c.Context(), user.ID)
+	if err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Failed to get ILO test results: "+err.Error())
+	}
+
+	// Create response array
+	var respResults []IloTestResultResponse
+	for _, result := range results {
+		respResults = append(respResults, IloTestResultResponse{
+			ID:               result.ID,
+			UserID:           result.UserID,
+			ResultData:       result.ResultData,
+			CreatedAt:        result.CreatedAt,
+			Scores:           result.Scores,
+			TopDomains:       result.TopDomains,
+			SuggestedCareers: result.SuggestedCareers,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"results":   respResults,
+		"copyright": "Thang đo ILO © ILO Vietnam 2020 – sử dụng cho mục đích hướng nghiệp, trích dẫn có ghi nguồn.",
+	})
+}
+
+// @Summary Get a specific ILO test result by ID
+// @Description Get a specific ILO test result by ID for the authenticated user
+// @Tags ilo
+// @Produce json
+// @Param id path string true "Result ID"
+// @Success 200 {object} IloTestResultResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/ilo/result/{id} [get]
+func (h *Handler) HandleGetIloResultById(c *fiber.Ctx) error {
+	token := utils.ExtractTokenFromHeader(c)
+	if token == "" {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Missing or invalid Authorization header")
+	}
+
+	// Validate token and get user ID
+	user, err := h.authClient.ValidateToken(c.Context(), token)
+	if err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusUnauthorized, "Invalid token: "+err.Error())
+	}
+
+	// Get result ID from path params
+	resultID := c.Params("id")
+	if resultID == "" {
+		return utils.SendErrorResponse(c, fiber.StatusBadRequest, "Missing result ID")
+	}
+
+	// Use the client method directly to retrieve the result by ID
+	result, err := h.IloClient.GetIloTestResultById(c.Context(), resultID)
+	if err != nil {
+		return utils.SendErrorResponse(c, fiber.StatusInternalServerError, "Failed to get ILO test result: "+err.Error())
+	}
+
+	// Verify that this result belongs to the authenticated user
+	if result.UserID != user.ID {
+		return utils.SendErrorResponse(c, fiber.StatusForbidden, "You don't have permission to access this result")
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"result":    result,
+		"copyright": "Thang đo ILO © ILO Vietnam 2020 – sử dụng cho mục đích hướng nghiệp, trích dẫn có ghi nguồn.",
+	})
 }

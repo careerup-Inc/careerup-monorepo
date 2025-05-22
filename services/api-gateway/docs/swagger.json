@@ -203,26 +203,123 @@
                 }
             }
         },
-        "/api/v1/profile": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
+        "/api/v1/ilo/result": {
+            "post": {
+                "description": "Submit ILO test result for the authenticated user and get analysis",
+                "consumes": [
+                    "application/json"
                 ],
-                "description": "Get the current authenticated user's profile",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "user"
+                    "ilo"
                 ],
-                "summary": "Get current user",
+                "summary": "Submit ILO test result",
+                "parameters": [
+                    {
+                        "description": "ILO Test Result Request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.IloTestResultRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handler.IloTestResultResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ilo/result/{id}": {
+            "get": {
+                "description": "Get a specific ILO test result by ID for the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ilo"
+                ],
+                "summary": "Get a specific ILO test result by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Result ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.User"
+                            "$ref": "#/definitions/handler.IloTestResultResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ilo/results": {
+            "get": {
+                "description": "Get all ILO test results for the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ilo"
+                ],
+                "summary": "Get all ILO test results for a user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handler.IloTestResultResponse"
+                            }
                         }
                     },
                     "401": {
@@ -238,7 +335,35 @@
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/ilo/test": {
+            "get": {
+                "description": "Get all questions for the ILO test",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ilo"
+                ],
+                "summary": "Get ILO test questions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetIloTestResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/profile": {
             "put": {
                 "security": [
                     {
@@ -295,6 +420,43 @@
                 }
             }
         },
+        "/api/v1/user/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the current authenticated user's profile",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Get current user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.User"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ws": {
             "get": {
                 "security": [
@@ -331,6 +493,26 @@
         }
     },
     "definitions": {
+        "client.IloDomainScore": {
+            "type": "object",
+            "properties": {
+                "domain_code": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "percent": {
+                    "type": "number"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "raw_score": {
+                    "type": "integer"
+                }
+            }
+        },
         "client.TokenResponse": {
             "type": "object",
             "properties": {
@@ -351,6 +533,147 @@
                 "error": {
                     "type": "string",
                     "example": "error message"
+                }
+            }
+        },
+        "handler.GetIloTestResponse": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.IloDomain"
+                    }
+                },
+                "levels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.IloLevel"
+                    }
+                },
+                "questions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.IloTestQuestion"
+                    }
+                }
+            }
+        },
+        "handler.IloAnswer": {
+            "type": "object",
+            "properties": {
+                "question_id": {
+                    "type": "string"
+                },
+                "question_number": {
+                    "type": "integer"
+                },
+                "selected_option": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.IloDomain": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.IloLevel": {
+            "type": "object",
+            "properties": {
+                "level_name": {
+                    "type": "string"
+                },
+                "max_percent": {
+                    "type": "integer"
+                },
+                "min_percent": {
+                    "type": "integer"
+                },
+                "suggestion": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.IloTestQuestion": {
+            "type": "object",
+            "properties": {
+                "domain_code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "question_number": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.IloTestResultRequest": {
+            "type": "object",
+            "properties": {
+                "answers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.IloAnswer"
+                    }
+                },
+                "result_data": {
+                    "type": "string",
+                    "example": "{\"score\":85,\"details\":{...}}"
+                }
+            }
+        },
+        "handler.IloTestResultResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "result_data": {
+                    "type": "string"
+                },
+                "scores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/client.IloDomainScore"
+                    }
+                },
+                "suggested_careers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "top_domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "user_id": {
+                    "type": "string"
                 }
             }
         },
@@ -426,6 +749,9 @@
         },
         "handler.UpdateUserRequest": {
             "type": "object",
+            "required": [
+                "token"
+            ],
             "properties": {
                 "first_name": {
                     "type": "string",
@@ -448,6 +774,10 @@
                 "last_name": {
                     "type": "string",
                     "example": "Doe"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                 }
             }
         },

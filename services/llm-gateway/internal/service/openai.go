@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	// Import LangChainGo OpenAI LLM
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
 )
@@ -34,7 +33,6 @@ func NewOpenAIService() (*OpenAIService, error) {
 
 // GetCompletion sends a prompt using LangChainGo and returns the completion.
 func (s *OpenAIService) GetCompletion(ctx context.Context, prompt string) (string, error) {
-	// Use GenerateFromSinglePrompt for simple prompt completion
 	completion, err := llms.GenerateFromSinglePrompt(ctx, s.llm, prompt)
 	if err != nil {
 		log.Printf("LangChainGo OpenAI GenerateFromSinglePrompt error: %v", err)

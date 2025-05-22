@@ -16,6 +16,7 @@ import (
 	"github.com/gofiber/swagger"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
 )
 
 // @title CareerUP API
@@ -92,11 +93,27 @@ func main() {
 	}
 	defer chatClient.Close()
 
+	// Initialize ILO and LLM gRPC connections
+	iloConn, err := grpc.NewClient(cfg.Ilo.ServiceAddr, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("Failed to connect to ILO service: %v", err)
+	}
+	defer iloConn.Close()
+	llmConn, err := grpc.NewClient(cfg.LLM.ServiceAddr, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("Failed to connect to LLM service: %v", err)
+	}
+	defer llmConn.Close()
+
+	// Initialize ILO and LLM clients
+	iloClient := client.NewIloClient(iloConn)
+	llmClient := client.NewLLMClient(llmConn)
+
 	// Initialize middlewares with auth client
 	authMiddleware := middleware.AuthMiddleware(authClient)
 
-	// Initialize handlers
-	mainHandler := handler.NewHandler(authClient, chatClient)
+	// Initialize handlers with auth-core service address for direct REST calls
+	mainHandler := handler.NewHandler(authClient, chatClient, iloClient, llmClient, cfg.Auth.ServiceAddr)
 
 	// Protected routes (Apply middleware before defining groups/routes)
 	protectedUser := app.Group("/api/v1/user", authMiddleware)       // Apply middleware to group
@@ -132,6 +149,15 @@ func main() {
 		// Chat routes with WebSocket support (Unprotected initial upgrade, auth done inside handler)
 		api.Get("/ws", mainHandler.HandleWebSocket)
 		api.Get("/ws", websocket.New(mainHandler.WebSocketProxy))
+
+		// ILO routes
+		ilo := api.Group("/ilo")
+		{
+			ilo.Get("/test", mainHandler.HandleGetIloTest)             // Get ILO test questions
+			ilo.Post("/result", mainHandler.HandleIloTestResult)       // Submit ILO test result
+			ilo.Get("/results", mainHandler.HandleGetIloResults)       // Get all ILO test results for user
+			ilo.Get("/result/:id", mainHandler.HandleGetIloResultById) // Get a specific ILO test result
+		}
 	}
 
 	// Start server

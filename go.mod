@@ -1,5 +1,5 @@
 module github.com/careerup-Inc/careerup-monorepo
 
-go 1.21
+go 1.23
 
-toolchain go1.24.2
+toolchain go1.24.3
