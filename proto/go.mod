@@ -1,6 +1,6 @@
 module github.com/careerup-Inc/careerup-monorepo/proto
 
-go 1.22
+go 1.23.0
 
 toolchain go1.24.2
 
@@ -11,8 +11,8 @@ require (
 
 require (
 	github.com/golang/protobuf v1.5.3 // indirect
-	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
 )
