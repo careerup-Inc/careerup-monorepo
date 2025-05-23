@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	LLMService_GenerateStream_FullMethodName = "/llm.v1.LLMService/GenerateStream"
+	LLMService_GenerateStream_FullMethodName  = "/llm.v1.LLMService/GenerateStream"
+	LLMService_GenerateWithRAG_FullMethodName = "/llm.v1.LLMService/GenerateWithRAG"
 )
 
 // LLMServiceClient is the client API for LLMService service.
@@ -28,6 +29,8 @@ const (
 type LLMServiceClient interface {
 	// GenerateStream streams responses from the LLM.
 	GenerateStream(ctx context.Context, in *GenerateStreamRequest, opts ...grpc.CallOption) (LLMService_GenerateStreamClient, error)
+	// GenerateWithRAG streams RAG-augmented responses from the LLM.
+	GenerateWithRAG(ctx context.Context, in *GenerateWithRAGRequest, opts ...grpc.CallOption) (LLMService_GenerateWithRAGClient, error)
 }
 
 type lLMServiceClient struct {
@@ -70,12 +73,46 @@ func (x *lLMServiceGenerateStreamClient) Recv() (*GenerateStreamResponse, error)
 	return m, nil
 }
 
+func (c *lLMServiceClient) GenerateWithRAG(ctx context.Context, in *GenerateWithRAGRequest, opts ...grpc.CallOption) (LLMService_GenerateWithRAGClient, error) {
+	stream, err := c.cc.NewStream(ctx, &LLMService_ServiceDesc.Streams[1], LLMService_GenerateWithRAG_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &lLMServiceGenerateWithRAGClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type LLMService_GenerateWithRAGClient interface {
+	Recv() (*GenerateWithRAGResponse, error)
+	grpc.ClientStream
+}
+
+type lLMServiceGenerateWithRAGClient struct {
+	grpc.ClientStream
+}
+
+func (x *lLMServiceGenerateWithRAGClient) Recv() (*GenerateWithRAGResponse, error) {
+	m := new(GenerateWithRAGResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // LLMServiceServer is the server API for LLMService service.
 // All implementations must embed UnimplementedLLMServiceServer
 // for forward compatibility
 type LLMServiceServer interface {
 	// GenerateStream streams responses from the LLM.
 	GenerateStream(*GenerateStreamRequest, LLMService_GenerateStreamServer) error
+	// GenerateWithRAG streams RAG-augmented responses from the LLM.
+	GenerateWithRAG(*GenerateWithRAGRequest, LLMService_GenerateWithRAGServer) error
 	mustEmbedUnimplementedLLMServiceServer()
 }
 
@@ -85,6 +122,9 @@ type UnimplementedLLMServiceServer struct {
 
 func (UnimplementedLLMServiceServer) GenerateStream(*GenerateStreamRequest, LLMService_GenerateStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method GenerateStream not implemented")
+}
+func (UnimplementedLLMServiceServer) GenerateWithRAG(*GenerateWithRAGRequest, LLMService_GenerateWithRAGServer) error {
+	return status.Errorf(codes.Unimplemented, "method GenerateWithRAG not implemented")
 }
 func (UnimplementedLLMServiceServer) mustEmbedUnimplementedLLMServiceServer() {}
 
@@ -120,6 +160,27 @@ func (x *lLMServiceGenerateStreamServer) Send(m *GenerateStreamResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _LLMService_GenerateWithRAG_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GenerateWithRAGRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(LLMServiceServer).GenerateWithRAG(m, &lLMServiceGenerateWithRAGServer{stream})
+}
+
+type LLMService_GenerateWithRAGServer interface {
+	Send(*GenerateWithRAGResponse) error
+	grpc.ServerStream
+}
+
+type lLMServiceGenerateWithRAGServer struct {
+	grpc.ServerStream
+}
+
+func (x *lLMServiceGenerateWithRAGServer) Send(m *GenerateWithRAGResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // LLMService_ServiceDesc is the grpc.ServiceDesc for LLMService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -131,6 +192,11 @@ var LLMService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "GenerateStream",
 			Handler:       _LLMService_GenerateStream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GenerateWithRAG",
+			Handler:       _LLMService_GenerateWithRAG_Handler,
 			ServerStreams: true,
 		},
 	},

@@ -8,6 +8,8 @@ option go_package = "github.com/careerup-Inc/careerup-monorepo/proto/llm/v1;llmv
 service LLMService {
   // GenerateStream streams responses from the LLM.
   rpc GenerateStream(GenerateStreamRequest) returns (stream GenerateStreamResponse);
+  // GenerateWithRAG streams RAG-augmented responses from the LLM.
+  rpc GenerateWithRAG(GenerateWithRAGRequest) returns (stream GenerateWithRAGResponse);
 }
 
 message GenerateStreamRequest {
@@ -20,4 +22,19 @@ message GenerateStreamResponse {
   string token = 1; // A single token chunk
   // Optionally add error information if needed at the token level
   // string error = 2;
+}
+
+message GenerateWithRAGRequest {
+  string prompt = 1;
+  string user_id = 2;
+  string conversation_id = 3;
+  // Optionally, specify a RAG collection or domain
+  string rag_collection = 4;
+  // Optionally, enable/disable adaptive RAG features
+  bool adaptive = 5;
+}
+
+message GenerateWithRAGResponse {
+  string token = 1;
+  // Optionally add error or metadata fields
 }
