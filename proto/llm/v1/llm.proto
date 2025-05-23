@@ -10,6 +10,12 @@ service LLMService {
   rpc GenerateStream(GenerateStreamRequest) returns (stream GenerateStreamResponse);
   // GenerateWithRAG streams RAG-augmented responses from the LLM.
   rpc GenerateWithRAG(GenerateWithRAGRequest) returns (stream GenerateWithRAGResponse);
+  
+  // Admin endpoints for dynamic document management
+  rpc IngestDocument(IngestDocumentRequest) returns (IngestDocumentResponse);
+  rpc CreateCollection(CreateCollectionRequest) returns (CreateCollectionResponse);
+  rpc ListCollections(ListCollectionsRequest) returns (ListCollectionsResponse);
+  rpc DeleteCollection(DeleteCollectionRequest) returns (DeleteCollectionResponse);
 }
 
 message GenerateStreamRequest {
@@ -37,4 +43,54 @@ message GenerateWithRAGRequest {
 message GenerateWithRAGResponse {
   string token = 1;
   // Optionally add error or metadata fields
+}
+
+// Admin endpoint messages for dynamic document management
+message IngestDocumentRequest {
+  string content = 1;
+  string collection = 2;
+  map<string, string> metadata = 3;
+  string document_id = 4; // Optional: if not provided, auto-generated
+}
+
+message IngestDocumentResponse {
+  string document_id = 1;
+  bool success = 2;
+  string message = 3;
+  int32 chunks_created = 4;
+}
+
+message CreateCollectionRequest {
+  string collection_name = 1;
+  map<string, string> metadata = 2;
+}
+
+message CreateCollectionResponse {
+  bool success = 1;
+  string message = 2;
+  string collection_name = 3;
+}
+
+message ListCollectionsRequest {
+  // Empty for now, could add pagination later
+}
+
+message ListCollectionsResponse {
+  repeated CollectionInfo collections = 1;
+}
+
+message CollectionInfo {
+  string name = 1;
+  int32 document_count = 2;
+  string created_at = 3;
+  map<string, string> metadata = 4;
+}
+
+message DeleteCollectionRequest {
+  string collection_name = 1;
+}
+
+message DeleteCollectionResponse {
+  bool success = 1;
+  string message = 2;
 }
