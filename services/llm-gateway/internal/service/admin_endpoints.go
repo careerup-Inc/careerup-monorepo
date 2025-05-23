@@ -315,11 +315,11 @@ Từ khóa: domain, %s, %s, career guidance, nghề nghiệp, khả năng`,
 		doc := schema.Document{
 			PageContent: content,
 			Metadata: map[string]interface{}{
-				"type":         "ilo_domain",
-				"domain_code":  domain.code,
-				"domain_name":  domain.name,
-				"indexed_at":   time.Now().Format(time.RFC3339),
-				"language":     "vietnamese",
+				"type":        "ilo_domain",
+				"domain_code": domain.code,
+				"domain_name": domain.name,
+				"indexed_at":  time.Now().Format(time.RFC3339),
+				"language":    "vietnamese",
 			},
 		}
 		docs = append(docs, doc)
@@ -407,11 +407,11 @@ Từ khóa: career, nghề nghiệp, %s, career guidance, %s`,
 		doc := schema.Document{
 			PageContent: content,
 			Metadata: map[string]interface{}{
-				"type":         "career_mapping",
-				"career_name":  career.career,
-				"domains":      career.domains,
-				"indexed_at":   time.Now().Format(time.RFC3339),
-				"language":     "vietnamese",
+				"type":        "career_mapping",
+				"career_name": career.career,
+				"domains":     career.domains,
+				"indexed_at":  time.Now().Format(time.RFC3339),
+				"language":    "vietnamese",
 			},
 		}
 		docs = append(docs, doc)
