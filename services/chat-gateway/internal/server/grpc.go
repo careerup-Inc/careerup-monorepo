@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
+	"strings"
 	"time"
 
 	pbChat "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
@@ -19,12 +21,14 @@ import (
 type ChatServer struct {
 	pbChat.UnimplementedConversationServiceServer                   // Embed the unimplemented server
 	llmClient                                     *client.LLMClient // Use the gRPC client wrapper
+	iloClient                                     *client.IloClient // ILO client for user context
 }
 
 // NewChatServer creates a new chat server instance.
-func NewChatServer(llmClient *client.LLMClient) *ChatServer {
+func NewChatServer(llmClient *client.LLMClient, iloClient *client.IloClient) *ChatServer {
 	return &ChatServer{
 		llmClient: llmClient,
+		iloClient: iloClient,
 	}
 }
 
@@ -90,82 +94,97 @@ func (s *ChatServer) Stream(stream pbChat.ConversationService_StreamServer) erro
 
 			log.Printf("Received user_msg from api-gateway: ConvID=%s", req.ConversationId)
 
-			// --- Trigger LLM Streaming Call ---
-			llmReq := &pbllm.GenerateStreamRequest{
-				Prompt:         req.Text,
-				UserId:         userID,             // Pass user ID if needed by LLM
-				ConversationId: req.ConversationId, // Pass conversation ID
+			// Fetch latest ILO test result for user (if available)
+			var iloContext string
+			if s.iloClient != nil && userID != "unknown" {
+				result, err := s.iloClient.GetLatestIloTestResult(ctx, userID)
+				if err != nil {
+					log.Printf("Failed to fetch ILO test result for user %s: %v", userID, err)
+				} else if result != nil {
+					// Compose a context string from ILO result (top domains, scores, suggestions)
+					iloContext = "User ILO profile: "
+					if len(result.TopDomains) > 0 {
+						iloContext += "Top domains: " + strings.Join(result.TopDomains, ", ") + ". "
+					}
+					if len(result.SuggestedCareers) > 0 {
+						iloContext += "Suggested careers: " + strings.Join(result.SuggestedCareers, ", ") + ". "
+					}
+					if len(result.Scores) > 0 {
+						scoreStrs := make([]string, 0, len(result.Scores))
+						for _, s := range result.Scores {
+							scoreStrs = append(scoreStrs, s.DomainCode+":"+fmt.Sprintf("%.0f%%", s.Percent))
+						}
+						iloContext += "Domain scores: " + strings.Join(scoreStrs, ", ") + ". "
+					}
+				}
 			}
 
-			// Create a new context for the LLM call with timeout
-			// Link it to the incoming stream's context for cancellation propagation
-			llmCtx, llmCancel := context.WithTimeout(ctx, 60*time.Second)
+			// --- Trigger LLM Streaming Call with RAG ---
+			llmReq := &pbllm.GenerateWithRAGRequest{
+				Prompt:         iloContext + req.Text,
+				UserId:         userID,
+				ConversationId: req.ConversationId,
+				RagCollection:  "academy", // Use "academy" or latest collection for RAG
+				Adaptive:       true,      // Enable adaptive RAG
+			}
 
-			log.Println("Calling LLMService.GenerateStream...")
-			llmStream, err := s.llmClient.GetLLMServiceClient().GenerateStream(llmCtx, llmReq)
+			llmCtx, llmCancel := context.WithTimeout(ctx, 60*time.Second)
+			log.Println("Calling LLMService.GenerateWithRAG...")
+			llmStream, err := s.llmClient.GetLLMServiceClient().GenerateWithRAG(llmCtx, llmReq)
 			if err != nil {
-				log.Printf("Failed to start LLM stream: %v", err)
-				llmCancel() // Cancel the context if the call failed
+				log.Printf("Failed to start LLM RAG stream: %v", err)
+				llmCancel()
 				errMsg := &pbChat.StreamResponse{
 					Type:    "error",
-					Content: &pbChat.StreamResponse_ErrorMessage{ErrorMessage: "Failed to connect to LLM service"},
+					Content: &pbChat.StreamResponse_ErrorMessage{ErrorMessage: "Failed to connect to LLM RAG service"},
 				}
 				if sendErr := stream.Send(errMsg); sendErr != nil {
 					log.Printf("Failed to send error message back to api-gateway: %v", sendErr)
 					return // Assume connection is broken
 				}
-				continue // Wait for next message from api-gateway
+				continue
 			}
 
-			log.Println("LLM stream started, receiving tokens...")
-
-			// Receive from LLM stream and forward to api-gateway stream
+			log.Println("LLM RAG stream started, receiving tokens...")
 			var llmReceiveErr error
 			for {
 				llmRes, err := llmStream.Recv()
 				if err == io.EOF {
-					log.Println("LLM stream ended.")
-					break // LLM finished sending tokens
+					log.Println("LLM RAG stream ended.")
+					break
 				}
 				if err != nil {
 					st, ok := status.FromError(err)
 					if ok && st.Code() == codes.Canceled {
-						log.Println("LLM stream context cancelled.")
+						log.Println("LLM RAG stream context cancelled.")
 					} else {
-						log.Printf("Error receiving from LLM stream: %v", err)
-						llmReceiveErr = err // Store error to potentially report
+						log.Printf("Error receiving from LLM RAG stream: %v", err)
+						llmReceiveErr = err
 					}
-					break // Stop processing this LLM response on any error
+					break
 				}
-
-				// Forward token to api-gateway
 				chatRes := &pbChat.StreamResponse{
 					Type:    "assistant_token",
 					Content: &pbChat.StreamResponse_Token{Token: llmRes.Token},
 				}
 				if err := stream.Send(chatRes); err != nil {
 					log.Printf("Error sending token to api-gateway stream: %v", err)
-					// If sending fails, the connection to api-gateway is likely broken.
-					llmCancel() // Cancel the LLM context
-					return      // Exit the outer goroutine
+					llmCancel()
+					return
 				}
-				// log.Printf("Forwarded token: %s", llmRes.Token) // Can be noisy
 			}
-
-			llmCancel() // Ensure LLM context is cancelled after loop finishes or breaks
-
-			// If there was an error receiving from LLM, send an error message
+			llmCancel()
 			if llmReceiveErr != nil {
 				errMsg := &pbChat.StreamResponse{
 					Type:    "error",
-					Content: &pbChat.StreamResponse_ErrorMessage{ErrorMessage: "Error receiving response from LLM"},
+					Content: &pbChat.StreamResponse_ErrorMessage{ErrorMessage: "Error receiving response from LLM RAG"},
 				}
 				if sendErr := stream.Send(errMsg); sendErr != nil {
 					log.Printf("Failed to send LLM error message back to api-gateway: %v", sendErr)
-					return // Assume connection is broken
+					return
 				}
 			}
-			// --- End LLM Streaming Call ---
+			// --- End LLM RAG Streaming Call ---
 
 			// TODO: Add Avatar Service call here if needed, send avatar_url message
 			// Example:

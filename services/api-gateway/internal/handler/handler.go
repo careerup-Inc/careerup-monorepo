@@ -565,16 +565,38 @@ func (h *Handler) HandleIloTestResult(c *fiber.Ctx) error {
 	}
 
 	// Create a rich prompt for LLM analysis with structured data
-	llmPrompt := "Analyze this ILO test result with the following domain scores:\n"
-	for _, score := range result.Scores {
-		llmPrompt += fmt.Sprintf("- %s: %.1f%% (%s)\n", score.DomainCode, score.Percent, score.Level)
+	// Build an expert‑level prompt so the LLM answers like a seasoned career‑guidance counsellor
+	promptLines := []string{
+		"You are a certified Vietnamese career counsellor who specialises in interpreting ILO tests for high-school students and parents.",
+		"You are a certified career guidance expert with deep knowledge of the Vietnamese ILO (Interest, Learning, Orientation) framework.",
+		"You are a friendly, slightly cheeky career-guidance guru who sprinkles gentle humour into professional advice.",
+		"Analyse the candidate’s ILO result and produce a report in vietnamese with the following sections:",
+		"1. Brief narrative overview of the candidate’s dominant interest profile.",
+		"2. Key strengths and potential development areas, illustrated with concrete examples.",
+		"3. Three to five career pathways that fit the profile, each followed by a one‑sentence rationale.",
+		"4. Actionable next steps for the candidate over the next 3–6 months (courses, extracurriculars, shadowing, mentorship, etc.).",
+		"ILO Domain Scores:",
+	}
+
+	for _, s := range result.Scores {
+		promptLines = append(promptLines, fmt.Sprintf("- %s: %.1f%% (%s)", s.DomainCode, s.Percent, s.Level))
 	}
 
 	if len(result.TopDomains) > 0 {
-		llmPrompt += "\nTop domains: " + strings.Join(result.TopDomains, ", ")
+		promptLines = append(promptLines, "",
+			"Top domains: "+strings.Join(result.TopDomains, ", "))
 	}
 
-	llmPrompt += "\nRaw data: " + req.ResultData
+	// Personalise advice if basic user context is available
+	if user.FirstName != "" {
+		promptLines = append(promptLines, "",
+			"Candidate first name: "+user.FirstName)
+	}
+
+	promptLines = append(promptLines, "",
+		"Raw ILO data: "+req.ResultData)
+
+	llmPrompt := strings.Join(promptLines, "\n")
 
 	llmAnalysis, err := h.LLMClient.AnalyzeILOResult(c.Context(), &client.LLMAnalysisRequest{
 		Prompt: llmPrompt,

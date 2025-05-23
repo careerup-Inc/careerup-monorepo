@@ -1,21 +1,25 @@
--- Helper function to map scales to domains
-CREATE OR REPLACE FUNCTION map_scale_to_domain(scale_name TEXT)
+-- Helper function to map question numbers to domains
+CREATE OR REPLACE FUNCTION map_question_to_domain(question_number INTEGER)
 RETURNS TEXT AS $$
 BEGIN
-    -- Map Vietnamese ILO scales to new domain codes
-    -- This is a simplification; actual mapping should be based on the specific ILO test structure
-    IF scale_name ILIKE '%ngôn ngữ%' OR scale_name ILIKE '%văn học%' OR scale_name ILIKE '%đọc viết%' THEN
+    -- Map questions to domains based on ILO test structure (12 questions per domain)
+    -- Questions 1-12: Language skills
+    IF question_number BETWEEN 1 AND 12 THEN
         RETURN 'LANG';
-    ELSIF scale_name ILIKE '%phân tích%' OR scale_name ILIKE '%logic%' OR scale_name ILIKE '%toán học%' OR scale_name ILIKE '%suy luận%' THEN
+    -- Questions 13-24: Logic and analytical skills  
+    ELSIF question_number BETWEEN 13 AND 24 THEN
         RETURN 'LOGIC';
-    ELSIF scale_name ILIKE '%thiết kế%' OR scale_name ILIKE '%nghệ thuật%' OR scale_name ILIKE '%màu sắc%' OR scale_name ILIKE '%hình học%' THEN
+    -- Questions 25-36: Design and creative skills
+    ELSIF question_number BETWEEN 25 AND 36 THEN
         RETURN 'DESIGN';
-    ELSIF scale_name ILIKE '%con người%' OR scale_name ILIKE '%giao tiếp%' OR scale_name ILIKE '%xã hội%' OR scale_name ILIKE '%nhóm%' THEN
+    -- Questions 37-48: People and interpersonal skills
+    ELSIF question_number BETWEEN 37 AND 48 THEN
         RETURN 'PEOPLE';
-    ELSIF scale_name ILIKE '%thể chất%' OR scale_name ILIKE '%cơ khí%' OR scale_name ILIKE '%kỹ thuật%' OR scale_name ILIKE '%vận động%' THEN
+    -- Questions 49-60: Mechanical and physical skills
+    ELSIF question_number BETWEEN 49 AND 60 THEN
         RETURN 'MECH';
     ELSE
-        -- Default to LANG if no match (should be replaced with appropriate logic)
+        -- Default to LANG for any unexpected question numbers
         RETURN 'LANG';
     END IF;
 END;
@@ -25,7 +29,7 @@ $$ LANGUAGE plpgsql;
 ALTER TABLE ilo_question_domains
     ADD CONSTRAINT uq_question_domain UNIQUE (question_id, domain_id);
 
--- Map existing questions to domains based on their scale (removed ilo_scales join)
+-- Map existing questions to domains based on question numbers
 INSERT INTO ilo_question_domains (question_id, domain_id, weight)
 SELECT 
     q.id AS question_id,
@@ -34,11 +38,11 @@ SELECT
 FROM 
     ilo_questions q
 JOIN 
-    ilo_domains d ON d.code = map_scale_to_domain(q.question_text)
+    ilo_domains d ON d.code = map_question_to_domain(q.question_number)
 ON CONFLICT (question_id, domain_id) DO NOTHING;
 
 -- Drop the temporary function
-DROP FUNCTION IF EXISTS map_scale_to_domain;
+DROP FUNCTION IF EXISTS map_question_to_domain;
 
 -- Create a view to simplify domain score calculation
 CREATE OR REPLACE VIEW ilo_question_domain_view AS

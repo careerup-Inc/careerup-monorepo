@@ -8,12 +8,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
-
 	pbChat "github.com/careerup-Inc/careerup-monorepo/proto/careerup/v1"
 	"github.com/careerup-Inc/careerup-monorepo/services/chat-gateway/internal/client"
 	"github.com/careerup-Inc/careerup-monorepo/services/chat-gateway/internal/server"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -50,8 +50,21 @@ func main() {
 	}
 	defer llmClient.Close() // Ensure connection is closed on shutdown
 
+	// Create ILO gRPC client connection (reuse llmServiceAddr for now, or use env var ILO_SERVICE_ADDR)
+	iloServiceAddr := os.Getenv("ILO_SERVICE_ADDR")
+	if iloServiceAddr == "" {
+		iloServiceAddr = "auth-core:9091"
+	}
+	connIlo, err := grpc.NewClient(iloServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to connect to ILO service: %v", err)
+	}
+	defer connIlo.Close()
+
+	iloClient := client.NewIloClient(connIlo)
+
 	// Create and register Chat service implementation
-	chatSvc := server.NewChatServer(llmClient)
+	chatSvc := server.NewChatServer(llmClient, iloClient)
 	// Use the correct registration function based on the generated code
 	pbChat.RegisterConversationServiceServer(grpcServer, chatSvc)
 	log.Println("ConversationService registered")
