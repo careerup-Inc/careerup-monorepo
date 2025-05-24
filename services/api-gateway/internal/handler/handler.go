@@ -50,7 +50,7 @@ type Handler struct {
 	authCoreServiceAddr string
 }
 
-func NewHandler(authClient *client.AuthClient, chatClient *client.ChatClient, iloClient *client.IloClient, llmClient *client.LLMClient, authCoreAddr string) *Handler {
+func NewHandler(authClient client.AuthClientInterface, chatClient client.ChatClientInterface, iloClient *client.IloClient, llmClient *client.LLMClient, authCoreAddr string) *Handler {
 	return &Handler{
 		authClient:          authClient,
 		chatClient:          chatClient,

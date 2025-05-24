@@ -25,6 +25,6 @@ WORKDIR /root/
 # Copy the pre-built binary file from the previous stage
 COPY --from=builder /app/server .
 
-EXPOSE 9090
+EXPOSE 50053 8090
 
 CMD ["./server"]

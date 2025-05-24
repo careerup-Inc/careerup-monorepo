@@ -78,11 +78,21 @@ services:
       context: ./services/llm-gateway
       dockerfile: Dockerfile
     ports:
-      - "9090:9090"
+      - "50053:50053"  # gRPC port
+      - "8090:8090"    # HTTP admin port
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      PINECONE_ENVIRONMENT: ${PINECONE_ENVIRONMENT}
     env_file:
-      - .env # Load OPENAI_API_KEY, etc.
+      - .env # Load other variables
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  redis_data: 
+  redis_data:
+
+networks:
+  default:
+  careerup-network:
+    external: true 

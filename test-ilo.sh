@@ -18,24 +18,12 @@ fi
 # 1. Fetch ILO questions
 QUESTIONS_JSON=$(curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$API_URL/api/v1/ilo/test")
 
-echo "QUESTIONS_JSON:"
-echo "$QUESTIONS_JSON" | jq
+# For debugging purposes
+# echo "QUESTIONS_JSON:" 
+# echo "$QUESTIONS_JSON" | jq
 
 # 2. Build answers array directly with jq
 ANSWERS_JSON=$(echo "$QUESTIONS_JSON" | jq '[.questions[] | {question_id: .id, question_number: .question_number, selected_option: (1 + (.question_number % 4))}]')
-
-# Create sample result data with domain information
-RESULT_DATA='{
-  "domains": {
-    "LANG": {"raw_score": 36, "percent": 75.0, "level": "Strong", "rank": 2},
-    "LOGIC": {"raw_score": 42, "percent": 87.5, "level": "Very Strong", "rank": 1},
-    "DESIGN": {"raw_score": 30, "percent": 62.5, "level": "Average", "rank": 3},
-    "PEOPLE": {"raw_score": 24, "percent": 50.0, "level": "Average", "rank": 4},
-    "MECH": {"raw_score": 18, "percent": 37.5, "level": "Weak", "rank": 5}
-  },
-  "top_domains": ["LOGIC", "LANG", "DESIGN"],
-  "suggested_careers": ["Software Engineer", "Data Scientist", "Business Analyst"]
-}'
 
 echo "Submitting answers:"
 echo "$ANSWERS_JSON" | jq

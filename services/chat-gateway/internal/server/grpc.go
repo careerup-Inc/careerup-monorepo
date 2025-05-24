@@ -124,8 +124,8 @@ func (s *ChatServer) Stream(stream pbChat.ConversationService_StreamServer) erro
 				Prompt:         iloContext + req.Text,
 				UserId:         userID,
 				ConversationId: req.ConversationId,
-				RagCollection:  "academy", // Use "academy" or latest collection for RAG
-				Adaptive:       true,      // Enable adaptive RAG
+				RagCollection:  "university-scores-2", // Example collection, adjust as needed
+				Adaptive:       true,                  // Enable adaptive RAG
 			}
 
 			llmCtx, llmCancel := context.WithTimeout(ctx, 60*time.Second)

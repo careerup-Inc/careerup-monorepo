@@ -5,4 +5,5 @@ use (
 	./services/api-gateway
 	./services/chat-gateway
 	./services/avatar-service
+	./services/llm-gateway
 )

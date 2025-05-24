@@ -16,7 +16,6 @@ service LLMService {
   rpc CreateCollection(CreateCollectionRequest) returns (CreateCollectionResponse);
   rpc ListCollections(ListCollectionsRequest) returns (ListCollectionsResponse);
   rpc DeleteCollection(DeleteCollectionRequest) returns (DeleteCollectionResponse);
-  rpc IngestILOData(IngestILODataRequest) returns (IngestILODataResponse);
 }
 
 message GenerateStreamRequest {
@@ -94,14 +93,4 @@ message DeleteCollectionRequest {
 message DeleteCollectionResponse {
   bool success = 1;
   string message = 2;
-}
-
-message IngestILODataRequest {
-  // Empty for now - uses hardcoded ILO domain data
-}
-
-message IngestILODataResponse {
-  bool success = 1;
-  string message = 2;
-  int32 docs_ingested = 3;
 }

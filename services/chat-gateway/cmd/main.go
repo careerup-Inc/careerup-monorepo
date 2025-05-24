@@ -26,7 +26,7 @@ func main() {
 
 	llmServiceAddr := os.Getenv("LLM_SERVICE_ADDR")
 	if llmServiceAddr == "" {
-		llmServiceAddr = "llm-gateway:9090" // Default address for llm-gateway (service name in Docker)
+		llmServiceAddr = "llm-gateway:50053" // Default address for llm-gateway (service name in Docker)
 	}
 
 	log.Printf("Starting Chat Gateway gRPC server on %s", grpcAddr)

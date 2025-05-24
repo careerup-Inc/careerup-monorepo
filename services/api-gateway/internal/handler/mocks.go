@@ -67,15 +67,7 @@ func (m *MockAuthClient) UpdateUser(ctx context.Context, req *client.UpdateUserR
 	return args.Get(0).(*client.User), args.Error(1)
 }
 
-// --- Mock Chat Client (Implementing ConversationService client interface) ---
-
-// Define an interface for the ChatClient if you haven't already
-// This makes mocking easier. Example:
-type ChatClientInterface interface {
-	// Ensure this matches the method signature in your actual client used by the handler
-	Stream(ctx context.Context) (chatpb.ConversationService_StreamClient, error)
-	// Add other methods if your ChatHandler uses them
-}
+// --- Mock Chat Client (Implementing ChatClientInterface) ---
 
 type MockChatClient struct {
 	mock.Mock
@@ -85,15 +77,19 @@ func NewMockChatClient() *MockChatClient {
 	return &MockChatClient{}
 }
 
-// Mock the Stream method to return a mock stream client
-// Ensure the return type matches the generated proto code for ConversationService_StreamClient
-func (m *MockChatClient) Stream(ctx context.Context) (chatpb.ConversationService_StreamClient, error) {
-	args := m.Called(ctx)
+// GetChatServiceClient implements ChatClientInterface
+func (m *MockChatClient) GetChatServiceClient() chatpb.ConversationServiceClient {
+	args := m.Called()
 	if args.Get(0) == nil {
-		return nil, args.Error(1)
+		return nil
 	}
-	// Return the mock stream client
-	return args.Get(0).(chatpb.ConversationService_StreamClient), args.Error(1)
+	return args.Get(0).(chatpb.ConversationServiceClient)
+}
+
+// Close implements ChatClientInterface
+func (m *MockChatClient) Close() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 // --- Mock Stream Client (Implementing ConversationService_StreamClient) ---

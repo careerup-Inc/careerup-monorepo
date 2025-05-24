@@ -14,9 +14,9 @@ import (
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/schema"
-	"github.com/tmc/langchaingo/vectorstores/chroma"
 
 	pbllm "github.com/careerup-Inc/careerup-monorepo/proto/llm/v1"
+	"github.com/careerup-Inc/careerup-monorepo/services/llm-gateway/internal/pinecone"
 )
 
 // QueryRoute represents the routing decision for a query
@@ -75,10 +75,11 @@ func DefaultRAGConfig() RAGConfig {
 // LLMServiceImpl implements the LLMService gRPC interface.
 type LLMServiceImpl struct {
 	pbllm.UnimplementedLLMServiceServer
-	llm          llms.Model               // LangChainGo LLM interface
-	embedder     embeddings.Embedder      // Embeddings model
-	vectorStores map[string]*chroma.Store // Vector stores for different collections
-	ragConfig    RAGConfig                // RAG configuration
+	llm            llms.Model                      // LangChainGo LLM interface
+	embedder       embeddings.Embedder             // Embeddings model
+	pineconeClient *pinecone.Client                // Pinecone client
+	collections    map[string]*pinecone.Collection // Collections metadata
+	ragConfig      RAGConfig                       // RAG configuration
 }
 
 // NewLLMService creates a new LLMService implementation using langchaingo.
@@ -86,6 +87,12 @@ func NewLLMService() (*LLMServiceImpl, error) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+	}
+
+	// Check for Pinecone API key
+	pineconeAPIKey := os.Getenv("PINECONE_API_KEY")
+	if pineconeAPIKey == "" {
+		return nil, fmt.Errorf("PINECONE_API_KEY environment variable not set")
 	}
 
 	// Initialize langchaingo OpenAI client
@@ -98,40 +105,95 @@ func NewLLMService() (*LLMServiceImpl, error) {
 		return nil, err
 	}
 
-	// Initialize OpenAI embeddings using the same LLM client
-	embedder, err := embeddings.NewEmbedder(llm)
+	// Choose embedding model based on environment variable
+	embeddingModel := os.Getenv("EMBEDDING_MODEL")
+	if embeddingModel == "" {
+		embeddingModel = "llama"
+	}
+
+	var embedder embeddings.Embedder
+
+	// Use OpenAI embeddings
+	log.Printf("Initializing OpenAI embeddings...")
+	embedder, err = embeddings.NewEmbedder(llm)
 	if err != nil {
 		log.Printf("Failed to initialize OpenAI embeddings: %v", err)
 		return nil, fmt.Errorf("failed to initialize embeddings: %v", err)
 	}
 
-	vectorStores := make(map[string]*chroma.Store)
+	vectorStores := make(map[string]*pinecone.Collection)
+
+	// Initialize Pinecone client
+	pineconeClient, err := pinecone.NewWithAPIKey(pineconeAPIKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize Pinecone client: %v", err)
+	}
 
 	return &LLMServiceImpl{
-		llm:          llm,
-		embedder:     embedder,
-		vectorStores: vectorStores,
-		ragConfig:    DefaultRAGConfig(),
+		llm:            llm,
+		embedder:       embedder,
+		pineconeClient: pineconeClient,
+		collections:    vectorStores,
+		ragConfig:      DefaultRAGConfig(),
 	}, nil
 }
 
 // retrieveDocuments retrieves relevant documents from the vector store
 func (s *LLMServiceImpl) retrieveDocuments(ctx context.Context, query string, collection string) ([]schema.Document, error) {
-	// Get or create vector store for collection
-	vs, ok := s.vectorStores[collection]
+	// Get collection metadata
+	_, ok := s.collections[collection]
 	if !ok {
-		// For now, return empty docs if collection doesn't exist
 		log.Printf("Collection %s not found, returning empty documents", collection)
 		return []schema.Document{}, nil
 	}
 
-	// Similarity search
-	docs, err := vs.SimilaritySearch(ctx, query, s.ragConfig.RetrievalTopK)
+	// Generate embedding for the query
+	queryEmbedding, err := s.embedder.EmbedQuery(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("similarity search failed: %v", err)
+		log.Printf("Failed to generate query embedding: %v", err)
+		return []schema.Document{}, nil
 	}
 
-	return docs, nil
+	// Convert embedding to float32 slice
+	queryEmbeddingFloat32 := make([]float32, len(queryEmbedding))
+	for i, v := range queryEmbedding {
+		queryEmbeddingFloat32[i] = float32(v)
+	}
+
+	// Query Pinecone for similar documents
+	queryReq := pinecone.QueryRequest{
+		QueryEmbeddings: [][]float32{queryEmbeddingFloat32},
+		NResults:        5, // Get top 5 most similar documents
+		Include:         []string{"metadatas"},
+	}
+
+	resp, err := s.pineconeClient.QueryDocuments(collection, queryReq)
+	if err != nil {
+		log.Printf("Failed to query Pinecone: %v", err)
+		return []schema.Document{}, nil
+	}
+
+	// Convert Pinecone results to schema.Document
+	var documents []schema.Document
+	if len(resp.Results) > 0 {
+		results := resp.Results[0] // First query results
+		for _, result := range results {
+			// Convert metadata map[string]string to map[string]any
+			metadata := make(map[string]any)
+			for k, v := range result.Metadata {
+				metadata[k] = v
+			}
+
+			doc := schema.Document{
+				PageContent: result.Content,
+				Metadata:    metadata,
+			}
+			documents = append(documents, doc)
+		}
+	}
+
+	log.Printf("Retrieved %d documents for query: %s", len(documents), query)
+	return documents, nil
 }
 
 // gradeDocumentRelevance checks if a document is relevant to the query
@@ -210,11 +272,11 @@ func (s *LLMServiceImpl) GenerateStream(req *pbllm.GenerateStreamRequest, stream
 			}
 			return nil
 		}),
-		llms.WithTemperature(0.9),
+		llms.WithTemperature(0.7),
 		llms.WithTopP(0.95),
 		llms.WithPresencePenalty(0.3),
 		llms.WithFrequencyPenalty(0.1),
-		llms.WithMaxTokens(1000),
+		// llms.WithMaxTokens(1024),
 	}
 
 	log.Println("Calling langchaingo LLM GenerateContent...")
@@ -242,7 +304,8 @@ func (s *LLMServiceImpl) GenerateWithRAG(
 	// Use default collection if not specified
 	collection := req.RagCollection
 	if collection == "" {
-		collection = "academy"
+		// TODO: work on this together with pinecone later
+		collection = "university-scores-2"
 	}
 
 	// Initialize RAG state for enhanced processing
@@ -490,7 +553,7 @@ func (s *LLMServiceImpl) webSearch(ctx context.Context, query string) ([]schema.
 func (s *LLMServiceImpl) routeQuery(ctx context.Context, query string) QueryRoute {
 	// Use LLM to intelligently route the query
 	routingPrompt := fmt.Sprintf(`You are an expert at routing a user question to a vectorstore or web search.
-The vectorstore contains documents related to CareerUP platform, career guidance, ILO assessments, and educational content.
+The vectorstore contains documents related to CareerUP platform, career guidance, university admissions, academic scores, and educational content.
 Use the vectorstore for questions on these topics. For current events, news, or general knowledge questions, use web search.
 
 Question: %s
@@ -547,7 +610,7 @@ func (s *LLMServiceImpl) GenerateWithRAGEnhanced(
 
 	collection := req.RagCollection
 	if collection == "" {
-		collection = "academy"
+		collection = "university-scores-2"
 	}
 
 	switch state.Route {
@@ -711,17 +774,32 @@ Answer:`, req.Prompt)
 
 // InitializeVectorStore creates a new vector store for the given collection
 func (s *LLMServiceImpl) InitializeVectorStore(collection string) error {
-	// Implement Chroma vector store initialization using langchaingo's chroma package
-	store, err := chroma.New(
-		chroma.WithNameSpace(collection),
-		chroma.WithEmbedder(s.embedder),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to initialize Chroma vector store: %w", err)
+	log.Printf("Creating Pinecone index: %s", collection)
+
+	// Add nil checks
+	if s.pineconeClient == nil {
+		return fmt.Errorf("Pinecone client is not initialized")
 	}
 
-	s.vectorStores[collection] = &store
-	log.Printf("Initialized Chroma vector store for collection %s", collection)
+	// Check if collection already exists
+	if _, exists := s.collections[collection]; exists {
+		log.Printf("Collection %s already exists", collection)
+		return nil
+	}
+
+	// Create collection using our Pinecone client
+	req := pinecone.CreateCollectionRequest{
+		Name:     collection,
+		Metadata: map[string]string{"created_at": time.Now().Format(time.RFC3339)},
+	}
+
+	createdCollection, err := s.pineconeClient.CreateCollection(req)
+	if err != nil {
+		return fmt.Errorf("failed to create Pinecone index: %w", err)
+	}
+
+	s.collections[collection] = createdCollection
+	log.Printf("Successfully created Pinecone index: %s", collection)
 	return nil
 }
 
@@ -737,28 +815,63 @@ func (s *LLMServiceImpl) ProcessDocumentChunks(content string, collection string
 
 	// Simplified: Use a basic splitter (split by paragraphs)
 	chunks := strings.Split(doc.PageContent, "\n\n")
-	splitDocs := make([]schema.Document, len(chunks))
-	for i, chunk := range chunks {
-		splitDocs[i] = schema.Document{
-			PageContent: chunk,
-			Metadata: map[string]interface{}{
-				"chunk_index": i,
-				"indexed_at":  time.Now().Format(time.RFC3339),
-			},
-		}
-	}
 
-	vs, ok := s.vectorStores[collection]
+	// Check if collection exists
+	_, ok := s.collections[collection]
 	if !ok {
-		log.Printf("Vector store for collection %s not found, documents not indexed", collection)
+		log.Printf("Collection %s not found, documents not indexed", collection)
 		return nil
 	}
 
-	_, err := vs.AddDocuments(context.Background(), splitDocs)
-	if err != nil {
-		return fmt.Errorf("failed to add documents to vector store: %v", err)
+	// Convert chunks to Pinecone documents with embeddings
+	var pineconeDocs []pinecone.Document
+	for i, chunk := range chunks {
+		chunkText := strings.TrimSpace(chunk)
+		if chunkText == "" {
+			continue // Skip empty chunks
+		}
+
+		// Generate embedding for this chunk
+		embedding, err := s.embedder.EmbedQuery(context.Background(), chunkText)
+		if err != nil {
+			log.Printf("Failed to generate embedding for chunk %d: %v", i, err)
+			continue
+		}
+
+		// Convert embedding to float32 slice
+		embeddingFloat32 := make([]float32, len(embedding))
+		for j, v := range embedding {
+			embeddingFloat32[j] = float32(v)
+		}
+
+		pineconeDocs = append(pineconeDocs, pinecone.Document{
+			ID:        fmt.Sprintf("%s_%d_%d", collection, time.Now().Unix(), i),
+			Content:   chunkText,
+			Embedding: embeddingFloat32,
+			Metadata: map[string]string{
+				"chunk_index": fmt.Sprintf("%d", i),
+				"indexed_at":  time.Now().Format(time.RFC3339),
+			},
+		})
 	}
 
-	log.Printf("Indexed %d document chunks into collection %s", len(splitDocs), collection)
+	if len(pineconeDocs) == 0 {
+		log.Printf("No valid chunks to index for collection %s", collection)
+		return nil
+	}
+
+	log.Printf("Generated embeddings for %d chunks in collection %s", len(pineconeDocs), collection)
+
+	// Add documents to Pinecone
+	req := pinecone.AddDocumentsRequest{
+		Documents: pineconeDocs,
+	}
+
+	_, err := s.pineconeClient.AddDocuments(collection, req)
+	if err != nil {
+		return fmt.Errorf("failed to add documents to Pinecone: %v", err)
+	}
+
+	log.Printf("Indexed %d document chunks into collection %s", len(pineconeDocs), collection)
 	return nil
 }
