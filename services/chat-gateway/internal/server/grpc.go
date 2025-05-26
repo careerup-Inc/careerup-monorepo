@@ -124,7 +124,7 @@ func (s *ChatServer) Stream(stream pbChat.ConversationService_StreamServer) erro
 				Prompt:         iloContext + req.Text,
 				UserId:         userID,
 				ConversationId: req.ConversationId,
-				RagCollection:  "university-scores-2", // Example collection, adjust as needed
+				RagCollection:  "university-scores", // TODO Example collection, adjust as needed
 				Adaptive:       true,                  // Enable adaptive RAG
 			}
 

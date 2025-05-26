@@ -10,7 +10,7 @@ The system consists of the following services:
 - **auth-core** (Java/Spring Boot): Users, profiles, bookings, payments
 - **rec-service** (Java/Quarkus): Recommendation & similarity ML
 - **chat-gateway** (Go/Fiber): Multiplex client WebSockets → LLM
-- **llm-gateway** (Go/LangChainGo): Prompt-orchestration, RAG, OpenAI calls
+- **llm-gateway** (Python/LangChain/langchain-tavily): Prompt-orchestration, RAG, OpenAI calls, Tavily API calls
 - **avatar-service** (Go): VRoid Studio model management
 - **notification** (Go/Fiber): Push alerts via Redis streams
 

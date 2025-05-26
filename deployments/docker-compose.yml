@@ -37,22 +37,45 @@ services:
     ports:
       - "8082:8082"
     environment:
-      - LLM_SERVICE_ADDR=llm-gateway:9090
+      - LLM_SERVICE_ADDR=llm-gateway-py:50054
     depends_on:
       - llm-gateway
 
   # LLM Gateway
-  llm-gateway:
+  llm-gateway-py:
     build:
-      context: ../services/llm-gateway
+      context: ../services/llm-gateway-py
       dockerfile: Dockerfile
     ports:
-      - "9090:9090"
+      - "50054:50054"  # gRPC port
+      - "8091:8091"    # HTTP admin port
     environment:
+      # Service configuration
+      - SERVICE_NAME=llm-gateway-py
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      
+      # Server configuration
+      - GRPC_PORT=50054
+      - HTTP_PORT=8091
+      - MAX_WORKERS=10
+      
+      # Admin API
+      - ENABLE_ADMIN_API=true
+      - ADMIN_API_KEY=admin-secret-key
+      
+      # External APIs (set these in .env or as environment variables)
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - PINECONE_API_KEY=${PINECONE_API_KEY}
-      - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      
+      # Pinecone configuration
+      - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT:-us-east-1-aws}
+      - PINECONE_INDEX=${PINECONE_INDEX:-university-scores}
+      
+      # Feature flags
+      - WEB_SEARCH_ENABLED=true
 
   # Avatar Service
   avatar-service:

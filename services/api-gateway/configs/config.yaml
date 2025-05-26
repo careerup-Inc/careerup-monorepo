@@ -17,7 +17,7 @@ ilo:
   service_addr: "auth-core:9091"
 
 llm:
-  service_addr: "llm-gateway:50053"
+  service_addr: "llm-gateway-py:50054"
 
 rate_limit:
   enabled: true
