@@ -11,6 +11,7 @@ langchain>=0.2.0
 langchain-openai>=0.1.8
 langchain-community>=0.2.0
 langchain-pinecone>=0.2.6
+langchain-huggingface>=0.2.0
 openai>=1.35.0
 tavily-python>=0.3.8
 
@@ -23,6 +24,7 @@ sentence-transformers==3.0.1
 pydantic==2.8.2
 python-multipart==0.0.9
 python-dotenv==1.0.1
+pypdf==4.3.1
 
 # Monitoring and logging
 structlog==23.2.0

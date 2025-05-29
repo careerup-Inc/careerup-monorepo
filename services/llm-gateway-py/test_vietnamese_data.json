@@ -1,0 +1,268 @@
+{
+  "universities": [
+    {
+      "name": "Đại học Bách Khoa Hà Nội",
+      "name_english": "Hanoi University of Science and Technology",
+      "code": "HUST",
+      "type": "Đại học công lập",
+      "location": {
+        "city": "Hà Nội",
+        "address": "1 Đại Cồ Việt, Hai Bà Trưng, Hà Nội"
+      },
+      "founded": 1956,
+      "description": "Đại học Bách Khoa Hà Nội là một trong những trường đại học kỹ thuật hàng đầu Việt Nam, chuyên đào tạo các ngành kỹ thuật và công nghệ.",
+      "website": "https://hust.edu.vn",
+      "programs": [
+        {
+          "name": "Kỹ thuật Máy tính",
+          "code": "IT1",
+          "degree_level": "Đại học",
+          "duration_years": 4,
+          "credits": 130,
+          "description": "Chương trình đào tạo kỹ sư máy tính với kiến thức chuyên sâu về phần cứng, phần mềm và hệ thống máy tính.",
+          "subjects": [
+            "Lập trình C/C++",
+            "Cấu trúc dữ liệu và giải thuật",
+            "Hệ điều hành",
+            "Mạng máy tính",
+            "Cơ sở dữ liệu"
+          ],
+          "career_prospects": [
+            "Kỹ sư phần mềm",
+            "Kỹ sư hệ thống",
+            "Chuyên viên bảo mật",
+            "Kiến trúc sư giải pháp"
+          ]
+        },
+        {
+          "name": "Kỹ thuật Điện tử - Viễn thông",
+          "code": "ET1",
+          "degree_level": "Đại học",
+          "duration_years": 4,
+          "credits": 135,
+          "description": "Đào tạo kỹ sư điện tử viễn thông với khả năng thiết kế, vận hành và bảo trì các hệ thống điện tử, viễn thông.",
+          "subjects": [
+            "Mạch điện tử",
+            "Xử lý tín hiệu số",
+            "Hệ thống viễn thông",
+            "Truyền dẫn quang",
+            "Mạng di động"
+          ],
+          "career_prospects": [
+            "Kỹ sư viễn thông",
+            "Kỹ sư điện tử",
+            "Chuyên viên mạng",
+            "Kỹ sư R&D"
+          ]
+        }
+      ],
+      "admissions": {
+        "2024": {
+          "methods": [
+            {
+              "name": "Xét tuyển dựa trên kết quả thi THPT",
+              "quota": 3500,
+              "subjects": ["Toán", "Lý", "Hóa"],
+              "min_score": 24.0,
+              "requirements": "Tốt nghiệp THPT với điểm trung bình môn xét tuyển tối thiểu 6.0"
+            },
+            {
+              "name": "Xét tuyển thẳng",
+              "quota": 200,
+              "requirements": "Học sinh giỏi quốc gia, khu vực hoặc có chứng chỉ quốc tế"
+            }
+          ],
+          "tuition_fee": {
+            "domestic": 1500000,
+            "international": 5000000,
+            "currency": "VND",
+            "period": "học kỳ"
+          },
+          "scholarships": [
+            "Học bổng toàn phần cho sinh viên xuất sắc",
+            "Học bổng 50% cho sinh viên có hoàn cảnh khó khăn",
+            "Học bổng doanh nghiệp"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Đại học Quốc gia Hà Nội",
+      "name_english": "Vietnam National University, Hanoi",
+      "code": "VNU",
+      "type": "Đại học quốc gia",
+      "location": {
+        "city": "Hà Nội",
+        "address": "144 Xuân Thủy, Cầu Giấy, Hà Nội"
+      },
+      "founded": 1993,
+      "description": "Đại học Quốc gia Hà Nội là một trong hai đại học quốc gia của Việt Nam, bao gồm nhiều trường thành viên và khoa đào tạo đa ngành.",
+      "website": "https://vnu.edu.vn",
+      "programs": [
+        {
+          "name": "Ngôn ngữ Anh",
+          "code": "EN1",
+          "degree_level": "Đại học",
+          "duration_years": 4,
+          "credits": 120,
+          "description": "Chương trình đào tạo giáo viên và chuyên viên ngôn ngữ Anh với trình độ cao về ngôn ngữ và văn hóa.",
+          "subjects": [
+            "Ngữ âm tiếng Anh",
+            "Ngữ pháp tiếng Anh",
+            "Văn học Anh - Mỹ",
+            "Dịch thuật",
+            "Phương pháp giảng dạy"
+          ],
+          "career_prospects": [
+            "Giáo viên tiếng Anh",
+            "Biên dịch viên",
+            "Chuyên viên đối ngoại",
+            "Hướng dẫn viên du lịch"
+          ]
+        },
+        {
+          "name": "Quản trị Kinh doanh",
+          "code": "BA1",
+          "degree_level": "Đại học",
+          "duration_years": 4,
+          "credits": 125,
+          "description": "Đào tạo cử nhân quản trị kinh doanh với kiến thức toàn diện về quản lý, marketing và tài chính doanh nghiệp.",
+          "subjects": [
+            "Quản trị học",
+            "Marketing căn bản",
+            "Tài chính doanh nghiệp",
+            "Quản trị nhân sự",
+            "Chiến lược kinh doanh"
+          ],
+          "career_prospects": [
+            "Quản lý doanh nghiệp",
+            "Chuyên viên marketing",
+            "Chuyên viên tài chính",
+            "Tư vấn kinh doanh"
+          ]
+        }
+      ],
+      "admissions": {
+        "2024": {
+          "methods": [
+            {
+              "name": "Xét tuyển dựa trên kết quả thi THPT",
+              "quota": 2800,
+              "subjects": ["Toán", "Văn", "Anh"],
+              "min_score": 22.5,
+              "requirements": "Tốt nghiệp THPT với điểm trung bình tối thiểu 6.5"
+            },
+            {
+              "name": "Xét tuyển bằng chứng chỉ quốc tế",
+              "quota": 150,
+              "requirements": "IELTS 6.5+ hoặc TOEFL iBT 80+"
+            }
+          ],
+          "tuition_fee": {
+            "domestic": 1200000,
+            "international": 4500000,
+            "currency": "VND",
+            "period": "học kỳ"
+          },
+          "scholarships": [
+            "Học bổng Chính phủ",
+            "Học bổng VNU Excellence",
+            "Học bổng trao đổi quốc tế"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Đại học Y Hà Nội",
+      "name_english": "Hanoi Medical University",
+      "code": "HMU",
+      "type": "Đại học công lập",
+      "location": {
+        "city": "Hà Nội",
+        "address": "1 Tôn Thất Tùng, Đống Đa, Hà Nội"
+      },
+      "founded": 1902,
+      "description": "Đại học Y Hà Nội là trường đại học y khoa lâu đời và uy tín nhất Việt Nam, đào tạo bác sĩ và chuyên gia y tế.",
+      "website": "https://hmu.edu.vn",
+      "programs": [
+        {
+          "name": "Bác sĩ Y khoa",
+          "code": "MD1",
+          "degree_level": "Đại học",
+          "duration_years": 6,
+          "credits": 180,
+          "description": "Chương trình đào tạo bác sĩ y khoa với kiến thức toàn diện về y học cơ bản và lâm sàng.",
+          "subjects": [
+            "Giải phẫu học",
+            "Sinh lý học",
+            "Bệnh lý học",
+            "Dược lý học",
+            "Nội khoa",
+            "Ngoại khoa",
+            "Sản phụ khoa"
+          ],
+          "career_prospects": [
+            "Bác sĩ lâm sàng",
+            "Bác sĩ chuyên khoa",
+            "Nghiên cứu viên y học",
+            "Quản lý y tế"
+          ]
+        },
+        {
+          "name": "Dược sĩ",
+          "code": "PH1",
+          "degree_level": "Đại học",
+          "duration_years": 5,
+          "credits": 150,
+          "description": "Đào tạo dược sĩ với kiến thức chuyên môn về thuốc, bào chế và quản lý dược.",
+          "subjects": [
+            "Hóa dược",
+            "Dược lý học",
+            "Bào chế",
+            "Dược động học",
+            "Quản lý dược"
+          ],
+          "career_prospects": [
+            "Dược sĩ bệnh viện",
+            "Dược sĩ nhà thuốc",
+            "Nghiên cứu phát triển thuốc",
+            "Quản lý dược phẩm"
+          ]
+        }
+      ],
+      "admissions": {
+        "2024": {
+          "methods": [
+            {
+              "name": "Xét tuyển dựa trên kết quả thi THPT",
+              "quota": 1200,
+              "subjects": ["Toán", "Lý", "Hóa", "Sinh"],
+              "min_score": 26.0,
+              "requirements": "Điểm trung bình các môn xét tuyển tối thiểu 7.0, sức khỏe tốt"
+            }
+          ],
+          "tuition_fee": {
+            "domestic": 2000000,
+            "international": 8000000,
+            "currency": "VND",
+            "period": "học kỳ"
+          },
+          "scholarships": [
+            "Học bổng Bộ Y tế",
+            "Học bổng tài năng y khoa",
+            "Học bổng doanh nghiệp dược phẩm"
+          ]
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "source": "Vietnamese University Data Test Set",
+    "created_at": "2024-12-19",
+    "version": "1.0",
+    "encoding": "UTF-8",
+    "total_universities": 3,
+    "total_programs": 7,
+    "notes": "Comprehensive test data covering various university types, programs, and admission information in Vietnamese"
+  }
+}

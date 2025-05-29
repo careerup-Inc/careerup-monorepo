@@ -19,12 +19,15 @@ class RAGConfig:
 
 @dataclass
 class VectorStoreConfig:
+    # TODO make dynamic later
     """Configuration for vector stores."""
     pinecone_api_key: Optional[str] = None
     pinecone_environment: str = "us-east-1-aws"
     default_index: str = "university-scores"
+    vietnamese_index: str = "vietnamese-university-data"
     embedding_model: str = "text-embedding-ada-002"
     embedding_dimensions: int = 1536
+    vietnamese_embedding_dimensions: int = 384
 
 @dataclass
 class ServiceConfig:
@@ -87,6 +90,8 @@ class ServiceConfig:
         self.vector_store.pinecone_api_key = self.pinecone_api_key
         self.vector_store.pinecone_environment = os.getenv("PINECONE_ENVIRONMENT", self.vector_store.pinecone_environment)
         self.vector_store.default_index = os.getenv("PINECONE_INDEX", self.vector_store.default_index)
+        self.vector_store.embedding_model = os.getenv("EMBEDDING_MODEL", self.vector_store.embedding_model)
+        self.vector_store.embedding_dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", str(self.vector_store.embedding_dimensions)))
         self.http_port = int(os.getenv("HTTP_PORT", "8091"))
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
         self.debug = os.getenv("DEBUG", "false").lower() == "true"

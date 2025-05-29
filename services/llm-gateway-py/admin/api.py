@@ -56,6 +56,19 @@ class ConfigResponse(BaseModel):
     http_port: int
     version: str
 
+class IngestDataRequest(BaseModel):
+    file_path: str = Field(..., description="Path to the data file (PDF or JSON)")
+    file_type: str = Field(default="auto", description="File type: 'pdf', 'json', or 'auto'")
+    collection_name: Optional[str] = Field(None, description="Target collection name")
+
+class IngestDataResponse(BaseModel):
+    success: bool
+    message: str
+    documents_processed: Optional[int] = None
+    summaries_created: Optional[int] = None
+    total_chunks: Optional[int] = None
+    duration: Optional[float] = None
+
 
 def create_admin_app() -> FastAPI:
     """Create FastAPI admin application.
@@ -186,7 +199,7 @@ def create_admin_app() -> FastAPI:
             llm_service = LLMServicer()
             
             # Prepare request
-            from proto.llm.v1 import llm_pb2
+            from llm.v1 import llm_pb2
             
             grpc_request = llm_pb2.PromptRequest(
                 query=sanitized_query,
@@ -236,7 +249,7 @@ def create_admin_app() -> FastAPI:
             llm_service = LLMServicer()
             
             # Prepare request
-            from proto.llm.v1 import llm_pb2
+            from llm.v1 import llm_pb2
             
             doc_requests = []
             for doc in documents:
@@ -266,6 +279,41 @@ def create_admin_app() -> FastAPI:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Document ingestion failed: {str(e)}"
+            )
+    
+    @app.post("/admin/ingest/vietnamese-university-data", response_model=IngestDataResponse, tags=["Admin"])
+    async def ingest_vietnamese_university_data(
+        request: IngestDataRequest,
+        api_key: str = Depends(verify_api_key)
+    ):
+        """Ingest Vietnamese university data (PDF and JSON) with adaptive RAG capabilities."""
+        try:
+            # Create LLM service instance
+            llm_service = LLMServicer()
+            
+            # Execute enhanced ingestion with multi-representation indexing
+            start_time = datetime.now(datetime.timezone.utc)
+            result = await llm_service.ingest_vietnamese_university_data(
+                file_path=request.file_path,
+                file_type=request.file_type,
+                collection_name=request.collection_name or "vietnamese-university-data"
+            )
+            duration = (datetime.now(datetime.timezone.utc) - start_time).total_seconds()
+            
+            return IngestDataResponse(
+                success=result["success"],
+                message=result["message"],
+                documents_processed=result.get("documents_processed"),
+                summaries_created=result.get("summaries_created"),
+                total_chunks=result.get("total_chunks"),
+                duration=duration
+            )
+            
+        except Exception as e:
+            logger.error(f"Vietnamese university data ingestion failed: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Data ingestion failed: {str(e)}"
             )
     
     @app.delete("/admin/metrics", tags=["Admin"])
@@ -334,6 +382,58 @@ def create_admin_app() -> FastAPI:
             "timestamp": get_timestamp()
         }
     
+    @app.delete("/admin/collections/{collection_name}", tags=["Admin"])
+    async def clear_collection(
+        collection_name: str,
+        api_key: str = Depends(verify_api_key)
+    ):
+        """Clear all data from a specific collection/index."""
+        try:
+            # Create LLM service instance
+            llm_service = LLMServicer()
+            
+            # Clear the collection
+            result = await llm_service.clear_collection(collection_name)
+            
+            return {
+                "success": True,
+                "message": f"Collection '{collection_name}' cleared successfully",
+                "collection_name": collection_name,
+                "cleared": result
+            }
+            
+        except Exception as e:
+            logger.error(f"Collection cleanup failed: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Collection cleanup failed: {str(e)}"
+            )
+
+    @app.get("/admin/collections", tags=["Admin"])
+    async def list_collections(
+        api_key: str = Depends(verify_api_key)
+    ):
+        """List all available collections/indexes."""
+        try:
+            # Create LLM service instance
+            llm_service = LLMServicer()
+            
+            # List collections
+            collections = await llm_service.list_collections()
+            
+            return {
+                "success": True,
+                "collections": collections,
+                "count": len(collections)
+            }
+            
+        except Exception as e:
+            logger.error(f"Collection listing failed: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Collection listing failed: {str(e)}"
+            )
+    
     return app
 
 
@@ -348,6 +448,6 @@ def get_admin_app() -> FastAPI:
         FastAPI admin application
     """
     global admin_app
-    if admin_app is None:
-        admin_app = create_admin_app()
+    # Always create a new app instance to ensure latest endpoints are registered
+    admin_app = create_admin_app()
     return admin_app
