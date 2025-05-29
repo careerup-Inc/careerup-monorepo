@@ -68,35 +68,7 @@ test_admin_endpoint() {
     echo "----------------------------------------"
 }
 
-# Function to test Vietnamese university data ingestion with enhanced format
-test_vietnamese_data_enhanced() {
-    echo -e "\n${YELLOW}Testing Enhanced Vietnamese University Data Ingestion${NC}"
-    
-    # Test ingestion endpoint with enhanced data
-    json_file_path="/Users/doviethoang/github/careerup-monorepo/services/llm-gateway-py/data/diem_chuan_dai_hoc_2024_enhanced.json"
-    pdf_file_path="/Users/doviethoang/github/careerup-monorepo/services/llm-gateway-py/data/de-an-tuyen-sinh-2024final.pdf"
-    
-    # Test JSON ingestion with enhanced format
-    if [[ -f "$json_file_path" ]]; then
-        echo "Testing enhanced JSON data ingestion..."
-        response=$(curl -s -X POST \
-            -H "Authorization: Bearer $ADMIN_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d "{\"file_path\": \"$json_file_path\", \"file_type\": \"json\", \"collection_name\": \"vietnamese-university-scores-enhanced\"}" \
-            "$ADMIN_HOST/admin/ingest/vietnamese-university-data" 2>/dev/null || echo "Failed")
-        
-        if [[ "$response" != "Failed" ]]; then
-            echo -e "${GREEN}✅ Enhanced JSON data ingestion initiated${NC}"
-            echo "$response" | jq . 2>/dev/null || echo "$response"
-        else
-            echo -e "${YELLOW}⚠️  Enhanced JSON ingestion endpoint test skipped${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠️  Enhanced JSON file not found: $json_file_path${NC}"
-    fi
-    
-    echo "----------------------------------------"
-}
+# Use ingest_vietnamese_data.py to ingest enhanced Vietnamese university data before testing
 
 # Function to test enhanced Vietnamese queries with improved data
 test_enhanced_vietnamese_queries() {
@@ -137,7 +109,6 @@ test_enhanced_vietnamese_queries() {
 
 # Function to test Vietnamese university data ingestion
 test_vietnamese_data() {
-    test_vietnamese_data_enhanced
     test_enhanced_vietnamese_queries
 }
 

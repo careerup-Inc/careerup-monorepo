@@ -809,77 +809,114 @@ Answer:"""
                 
                 documents = []
                 if isinstance(data, list):
-                    # Process each university record
+                    # Process each university record as a separate document
                     for i, record in enumerate(data):
-                        # Create comprehensive document content
-                        content_parts = []
-                        metadata = {
-                            "source": file_path,
-                            "document_type": "university_admission_data",
-                            "record_index": i
-                        }
                         
-                        # Extract key information for searchable content
-                        if record.get("ten_truong"):
-                            content_parts.append(f"Tên trường: {record['ten_truong']}")
-                            metadata["university_name"] = record["ten_truong"]
+                        # Check if this is the enhanced format (simple content-only structure)
+                        if isinstance(record, dict) and len(record) == 1 and 'content' in record:
+                            # Enhanced format: just content field
+                            content = record.get('content', '').strip()
+                            
+                            if not content:
+                                logger.warning(f"Record {i} has empty content, skipping...")
+                                continue
+                            
+                            # Create metadata from the content by parsing key information
+                            metadata = {
+                                "source": file_path,
+                                "document_type": "vietnamese_university_enhanced",
+                                "record_index": i,
+                                "format": "enhanced"
+                            }
+                            
+                            # Extract structured information from content for better search
+                            # Parse university name
+                            if " tại " in content:
+                                university_part = content.split(" tại ")[1].split(".")[0]
+                                metadata["university"] = university_part.strip()
+                            
+                            # Parse program name (first part before "tại")
+                            if " tại " in content:
+                                program_part = content.split(" tại ")[0]
+                                if program_part.startswith("Ngành "):
+                                    metadata["major"] = program_part[6:].strip()  # Remove "Ngành "
+                            
+                            # Parse admission score
+                            if "Điểm chuẩn năm 2024: " in content:
+                                score_part = content.split("Điểm chuẩn năm 2024: ")[1].split(" điểm")[0]
+                                try:
+                                    metadata["admission_score"] = float(score_part)
+                                except:
+                                    metadata["admission_score"] = score_part
+                            
+                            # Parse subject combinations
+                            if "Tổ hợp môn xét tuyển: " in content:
+                                subjects_part = content.split("Tổ hợp môn xét tuyển: ")[1].split(".")[0]
+                                metadata["subject_combinations"] = subjects_part.strip()
+                            
+                            # Parse competition level
+                            if "Mức độ cạnh tranh: " in content:
+                                competition_part = content.split("Mức độ cạnh tranh: ")[1].split(".")[0]
+                                metadata["competition_level"] = competition_part.strip()
+                            
+                            # Parse admission method
+                            if "Phương thức tuyển sinh: " in content:
+                                method_part = content.split("Phương thức tuyển sinh: ")[1].split(".")[0]
+                                metadata["admission_method"] = method_part.strip()
+                            
+                            logger.info(f"Enhanced format record {i}: {content[:100]}...")
                         
-                        if record.get("ma_truong"):
-                            content_parts.append(f"Mã trường: {record['ma_truong']}")
-                            metadata["university_code"] = record["ma_truong"]
+                        elif isinstance(record, dict) and 'metadata' in record and 'content' in record:
+                            # Original enhanced format with metadata and content
+                            content = record.get('content', '').strip()
+                            metadata_obj = record.get('metadata', {})
+                            
+                            if not content:
+                                logger.warning(f"Record {i} has empty content, skipping...")
+                                continue
+                            
+                            # Build metadata from the metadata object
+                            metadata = {
+                                "source": file_path,
+                                "document_type": "vietnamese_university_original",
+                                "record_index": i,
+                                "format": "original_enhanced"
+                            }
+                            
+                            # Add all fields from the metadata object
+                            for key, value in metadata_obj.items():
+                                if value is not None:
+                                    if isinstance(value, list):
+                                        metadata[key] = ", ".join(str(v) for v in value)
+                                    else:
+                                        metadata[key] = str(value)
+                            
+                            logger.info(f"Original enhanced format record {i}: {content[:100]}...")
                         
-                        if record.get("tinh_thanh"):
-                            content_parts.append(f"Tỉnh/Thành: {record['tinh_thanh']}")
-                            metadata["province"] = record["tinh_thanh"]
+                        else:
+                            # Fallback for other formats
+                            logger.warning(f"Unknown record format at index {i}, attempting to process...")
+                            content = str(record)
+                            metadata = {
+                                "source": file_path,
+                                "document_type": "vietnamese_university_unknown",
+                                "record_index": i,
+                                "format": "unknown"
+                            }
                         
-                        if record.get("nganh_hoc"):
-                            content_parts.append(f"Ngành học: {record['nganh_hoc']}")
-                            metadata["major"] = record["nganh_hoc"]
-                        
-                        if record.get("ma_nganh"):
-                            content_parts.append(f"Mã ngành: {record['ma_nganh']}")
-                            metadata["major_code"] = record["ma_nganh"]
-                        
-                        if record.get("diem_chuan"):
-                            content_parts.append(f"Điểm chuẩn: {record['diem_chuan']}")
-                            metadata["admission_score"] = record["diem_chuan"]
-                        
-                        if record.get("to_hop_xet_tuyen"):
-                            content_parts.append(f"Tổ hợp xét tuyển: {record['to_hop_xet_tuyen']}")
-                            metadata["subject_combination"] = record["to_hop_xet_tuyen"]
-                        
-                        if record.get("phuong_thuc"):
-                            content_parts.append(f"Phương thức: {record['phuong_thuc']}")
-                            metadata["admission_method"] = record["phuong_thuc"]
-                        
-                        if record.get("chi_tieu"):
-                            content_parts.append(f"Chỉ tiêu: {record['chi_tieu']}")
-                            metadata["quota"] = record["chi_tieu"]
-                        
-                        if record.get("ghi_chu"):
-                            content_parts.append(f"Ghi chú: {record['ghi_chu']}")
-                            metadata["notes"] = record["ghi_chu"]
-                        
-                        # Create searchable content
-                        content = "\n".join(content_parts)
-                        
-                        # Add comprehensive summary for better RAG retrieval
-                        if record.get("ten_truong") and record.get("nganh_hoc"):
-                            summary = f"Thông tin tuyển sinh {record['nganh_hoc']} tại {record['ten_truong']}"
-                            if record.get("diem_chuan"):
-                                summary += f" với điểm chuẩn {record['diem_chuan']}"
-                            if record.get("tinh_thanh"):
-                                summary += f" ở {record['tinh_thanh']}"
-                            content = f"{summary}\n\n{content}"
-                        
+                        # Create document
                         doc = Document(
                             page_content=content,
                             metadata=metadata
                         )
                         documents.append(doc)
                         documents_processed += 1
+                        
+                        # Log progress for first few and every 100 documents
+                        if i < 5 or i % 100 == 0:
+                            logger.info(f"Processed document {i}: {len(content)} chars, university: {metadata.get('university', 'Unknown')}")
                 
-                logger.info(f"Processed {documents_processed} university records from JSON")
+                logger.info(f"Processed {documents_processed} university records from enhanced JSON")
                 
             elif file_type == "pdf":
                 # Handle PDF file
@@ -893,7 +930,8 @@ Answer:"""
                     doc.metadata.update({
                         "source": file_path,
                         "document_type": "university_guidelines",
-                        "page_number": i + 1
+                        "page_number": i + 1,
+                        "format": "pdf"
                     })
                 
                 documents_processed = len(documents)
@@ -904,36 +942,25 @@ Answer:"""
             
             # Split documents into chunks for better retrieval
             if documents:
-                # For JSON data, we already have individual records as documents
-                # Only split if documents are still too large
-                if file_type == "json":
-                    # Check if any document is too large (> 3MB to be safe)
-                    large_docs = [doc for doc in documents if len(doc.page_content.encode('utf-8')) > 3000000]
-                    
-                    if large_docs:
-                        logger.warning(f"Found {len(large_docs)} oversized documents, splitting them")
-                        # Split only the large documents
-                        all_chunks = []
-                        for doc in documents:
-                            if len(doc.page_content.encode('utf-8')) > 3000000:
-                                chunks = self.text_splitter.split_documents([doc])
-                                all_chunks.extend(chunks)
-                            else:
-                                all_chunks.append(doc)
-                        documents = all_chunks
-                    
-                    total_chunks = len(documents)
-                else:
-                    # For PDF, always split into chunks
-                    all_chunks = self.text_splitter.split_documents(documents)
-                    total_chunks = len(all_chunks)
-                    
-                    if total_chunks == 0:
-                        logger.warning("No chunks created from documents. Using original documents as chunks.")
-                        all_chunks = documents
-                        total_chunks = len(documents)
-                    
+                logger.info(f"Processing {len(documents)} documents for vector store ingestion")
+                
+                # For the enhanced JSON format, documents are already well-sized
+                # Only split if individual documents are extremely large
+                oversized_docs = [doc for doc in documents if len(doc.page_content.encode('utf-8')) > 2000000]  # 2MB limit
+                
+                if oversized_docs:
+                    logger.warning(f"Found {len(oversized_docs)} oversized documents, splitting them")
+                    all_chunks = []
+                    for doc in documents:
+                        if len(doc.page_content.encode('utf-8')) > 2000000:
+                            chunks = self.text_splitter.split_documents([doc])
+                            all_chunks.extend(chunks)
+                        else:
+                            all_chunks.append(doc)
                     documents = all_chunks
+                    logger.info(f"After splitting: {len(documents)} total chunks")
+                
+                total_chunks = len(documents)
                 
                 # Use Vietnamese vector store if available, otherwise fall back to regular vector store
                 target_vector_store = self.vietnamese_vector_store or self.vector_store
@@ -942,8 +969,9 @@ Answer:"""
                     raise ValueError("No vector store available for ingestion")
                 
                 # Process documents in batches to avoid overwhelming Pinecone
-                batch_size = 50  # Process 50 documents at a time
+                batch_size = 100  # Increase batch size since enhanced documents are more manageable
                 total_docs = len(documents)
+                successful_ingestions = 0
                 
                 for i in range(0, total_docs, batch_size):
                     batch = documents[i:i + batch_size]
@@ -952,18 +980,31 @@ Answer:"""
                     
                     logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} documents)")
                     
-                    # Add documents to vector store
-                    await asyncio.get_event_loop().run_in_executor(
-                        None,
-                        lambda: target_vector_store.add_documents(batch)
-                    )
+                    # Log sample content from batch for debugging
+                    if batch and logger.isEnabledFor(logging.INFO):
+                        sample_doc = batch[0]
+                        logger.info(f"Sample document content: {sample_doc.page_content[:200]}...")
+                        logger.info(f"Sample document metadata: {sample_doc.metadata}")
+                    
+                    try:
+                        # Add documents to vector store
+                        await asyncio.get_event_loop().run_in_executor(
+                            None,
+                            lambda: target_vector_store.add_documents(batch)
+                        )
+                        successful_ingestions += len(batch)
+                        logger.info(f"Successfully processed batch {batch_num}/{total_batches}")
+                    except Exception as e:
+                        logger.error(f"Error processing batch {batch_num}: {e}")
+                        # Continue with next batch instead of failing completely
+                        continue
                 
-                logger.info(f"Successfully ingested {total_docs} documents into vector store")
+                logger.info(f"Successfully ingested {successful_ingestions}/{total_docs} documents into vector store")
                 
-                # For JSON data, count summaries as the number of enhanced records
+                # Set summaries created equal to successful ingestions for JSON data
                 if file_type == "json":
-                    summaries_created = documents_processed
-                    total_chunks = len(documents)
+                    summaries_created = successful_ingestions
+                    total_chunks = successful_ingestions
             
             return {
                 "success": True,
