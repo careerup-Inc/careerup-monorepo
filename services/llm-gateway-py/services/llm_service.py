@@ -115,10 +115,10 @@ class LLMServicer(llm_pb2_grpc.LLMServiceServicer):
                 
             self.embeddings = HuggingFaceEmbeddings(
                 model_name=model_name,
-                model_kwargs={'device': 'cpu'}  # Use CPU for compatibility
+                model_kwargs={'device': 'cpu'},  # Use CPU for compatibility
+                encode_kwargs={'normalize_embeddings': True}
             )
             logger.info(f"Initialized HuggingFace embeddings with model: {model_name}")
-            
         else:
             # Default to OpenAI embeddings
             self.embeddings = OpenAIEmbeddings(
@@ -128,8 +128,8 @@ class LLMServicer(llm_pb2_grpc.LLMServiceServicer):
             logger.info(f"Initialized OpenAI embeddings with model: {embedding_model}")
         
         # Initialize Pinecone
-        if self.config.vector_store.pinecone_api_key:
-            self.pinecone = Pinecone(api_key=self.config.vector_store.pinecone_api_key)
+        if hasattr(self.config, 'pinecone_api_key') and self.config.pinecone_api_key:
+            self.pinecone = Pinecone(api_key=self.config.pinecone_api_key)
             self._initialize_vector_store()
             self._initialize_vietnamese_vector_store()
         else:
@@ -141,7 +141,7 @@ class LLMServicer(llm_pb2_grpc.LLMServiceServicer):
         if self.config.rag.web_search_enabled and self.config.rag.web_search_api_key:
             self.web_search = TavilySearchResults(
                 api_key=self.config.rag.web_search_api_key,
-                max_results=3
+                max_results=5
             )
         else:
             logger.warning("Web search disabled or API key not provided")
@@ -161,9 +161,12 @@ class LLMServicer(llm_pb2_grpc.LLMServiceServicer):
         try:
             # Check if index exists
             index_name = self.config.vector_store.default_index
-            
+
+            if not index_name:
+                raise ValueError("No index name specified in configuration")
+
             # Connect to existing index
-            index = self.pinecone.Index(index_name)
+            index = self.pinecone.Index(name=index_name)
             
             # Create LangChain Pinecone wrapper
             self.vector_store = PineconeVectorStore(
@@ -181,11 +184,18 @@ class LLMServicer(llm_pb2_grpc.LLMServiceServicer):
     def _initialize_vietnamese_vector_store(self):
         """Initialize Vietnamese vector store with Llama embeddings and correct index."""
         try:
-            # Use the Vietnamese index and dimensions
-            vietnamese_index_name = self.config.vector_store.vietnamese_index
+            # Use the Vietnamese index name from config
+            # vietnamese_index_name = getattr(self.config.vector_store, 'vietnamese_index', 'vietnamese-university-data')
+
+            # For now, use the same index as the main one since we only have university-scores
+            # TODO: Create separate Vietnamese index when needed
+            index_name = self.config.vector_store.default_index
             
-            # Connect to Vietnamese index
-            vietnamese_index = self.pinecone.Index(vietnamese_index_name)
+            if not index_name:
+                raise ValueError("No Vietnamese index name specified")
+        
+            # Connect to Vietnamese index with explicit name
+            vietnamese_index = self.pinecone.Index(name=index_name)
             
             # Create LangChain Pinecone wrapper with Llama embeddings (384 dimensions)
             self.vietnamese_vector_store = PineconeVectorStore(
@@ -194,7 +204,7 @@ class LLMServicer(llm_pb2_grpc.LLMServiceServicer):
                 text_key="text"
             )
             
-            logger.info(f"Connected to Vietnamese Pinecone index: {vietnamese_index_name}")
+            logger.info(f"Connected to Vietnamese Pinecone index: {vietnamese_index}")
             
         except Exception as e:
             logger.error(f"Failed to initialize Vietnamese vector store: {e}")
@@ -894,8 +904,36 @@ Answer:"""
             
             # Split documents into chunks for better retrieval
             if documents:
-                all_chunks = self.text_splitter.split_documents(documents)
-                total_chunks = len(all_chunks)
+                # For JSON data, we already have individual records as documents
+                # Only split if documents are still too large
+                if file_type == "json":
+                    # Check if any document is too large (> 3MB to be safe)
+                    large_docs = [doc for doc in documents if len(doc.page_content.encode('utf-8')) > 3000000]
+                    
+                    if large_docs:
+                        logger.warning(f"Found {len(large_docs)} oversized documents, splitting them")
+                        # Split only the large documents
+                        all_chunks = []
+                        for doc in documents:
+                            if len(doc.page_content.encode('utf-8')) > 3000000:
+                                chunks = self.text_splitter.split_documents([doc])
+                                all_chunks.extend(chunks)
+                            else:
+                                all_chunks.append(doc)
+                        documents = all_chunks
+                    
+                    total_chunks = len(documents)
+                else:
+                    # For PDF, always split into chunks
+                    all_chunks = self.text_splitter.split_documents(documents)
+                    total_chunks = len(all_chunks)
+                    
+                    if total_chunks == 0:
+                        logger.warning("No chunks created from documents. Using original documents as chunks.")
+                        all_chunks = documents
+                        total_chunks = len(documents)
+                    
+                    documents = all_chunks
                 
                 # Use Vietnamese vector store if available, otherwise fall back to regular vector store
                 target_vector_store = self.vietnamese_vector_store or self.vector_store
@@ -903,17 +941,29 @@ Answer:"""
                 if not target_vector_store:
                     raise ValueError("No vector store available for ingestion")
                 
-                # Add documents to vector store
-                await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: target_vector_store.add_documents(all_chunks)
-                )
+                # Process documents in batches to avoid overwhelming Pinecone
+                batch_size = 50  # Process 50 documents at a time
+                total_docs = len(documents)
                 
-                logger.info(f"Successfully ingested {total_chunks} chunks into vector store")
+                for i in range(0, total_docs, batch_size):
+                    batch = documents[i:i + batch_size]
+                    batch_num = i // batch_size + 1
+                    total_batches = (total_docs + batch_size - 1) // batch_size
+                    
+                    logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} documents)")
+                    
+                    # Add documents to vector store
+                    await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: target_vector_store.add_documents(batch)
+                    )
+                
+                logger.info(f"Successfully ingested {total_docs} documents into vector store")
                 
                 # For JSON data, count summaries as the number of enhanced records
                 if file_type == "json":
                     summaries_created = documents_processed
+                    total_chunks = len(documents)
             
             return {
                 "success": True,

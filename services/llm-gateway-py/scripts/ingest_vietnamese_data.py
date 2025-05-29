@@ -68,7 +68,7 @@ async def ingest_vietnamese_data():
         json_result = await llm_service.ingest_vietnamese_university_data(
             file_path=json_file,
             file_type="json",
-            collection_name="vietnamese-university-scores"
+            collection_name="vietnamese-university-rag-1536"
         )
         json_time = time.time() - json_start
         print(f"⏱️  JSON processing completed in {json_time:.1f} seconds")

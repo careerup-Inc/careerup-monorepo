@@ -19,15 +19,17 @@ class RAGConfig:
 
 @dataclass
 class VectorStoreConfig:
-    # TODO make dynamic later
-    """Configuration for vector stores."""
-    pinecone_api_key: Optional[str] = None
-    pinecone_environment: str = "us-east-1-aws"
-    default_index: str = "university-scores"
-    vietnamese_index: str = "vietnamese-university-data"
-    embedding_model: str = "text-embedding-ada-002"
-    embedding_dimensions: int = 1536
-    vietnamese_embedding_dimensions: int = 384
+    def __init__(self):
+        """Initialize with default values."""
+        self.pinecone_api_key: Optional[str] = None
+        self.pinecone_environment= os.getenv("PINECONE_ENVIRONMENT", "us-east-1")
+        self.default_index = os.getenv("PINECONE_INDEX_NAME", "vietnamese-university-rag")
+        self.embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")  # 1536 dims
+        # dynamically set dimensions based on model
+        if self.embedding_model == "llama":
+            self.embedding_dimensions = 384
+        else:
+            self.embedding_dimensions = 1536
 
 @dataclass
 class ServiceConfig:
@@ -91,7 +93,10 @@ class ServiceConfig:
         self.vector_store.pinecone_environment = os.getenv("PINECONE_ENVIRONMENT", self.vector_store.pinecone_environment)
         self.vector_store.default_index = os.getenv("PINECONE_INDEX", self.vector_store.default_index)
         self.vector_store.embedding_model = os.getenv("EMBEDDING_MODEL", self.vector_store.embedding_model)
-        self.vector_store.embedding_dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", str(self.vector_store.embedding_dimensions)))
+        if self.vector_store.embedding_model == "llama":
+            self.vector_store.embedding_dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", "384"))
+        else:
+            self.vector_store.embedding_dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
         self.http_port = int(os.getenv("HTTP_PORT", "8091"))
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
         self.debug = os.getenv("DEBUG", "false").lower() == "true"

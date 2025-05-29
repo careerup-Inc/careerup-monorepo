@@ -292,13 +292,14 @@ def create_admin_app() -> FastAPI:
             llm_service = LLMServicer()
             
             # Execute enhanced ingestion with multi-representation indexing
-            start_time = datetime.now(datetime.timezone.utc)
+            from datetime import datetime, timezone
+            start_time = datetime.now(timezone.utc)
             result = await llm_service.ingest_vietnamese_university_data(
                 file_path=request.file_path,
                 file_type=request.file_type,
                 collection_name=request.collection_name or "vietnamese-university-data"
             )
-            duration = (datetime.now(datetime.timezone.utc) - start_time).total_seconds()
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             
             return IngestDataResponse(
                 success=result["success"],
