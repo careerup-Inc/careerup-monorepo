@@ -1,0 +1,3 @@
+[submodule "careerup-frondend"]
+	path = careerup-frondend
+	url = https://github.com/careerup-Inc/careerup-frondend
